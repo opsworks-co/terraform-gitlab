@@ -1,0 +1,354 @@
+projects:
+  - name: project-beta
+    create: true
+    namespace: "alpha"
+    visibility: private
+    settings: {}
+  - name: project-gamma
+    create: true
+    namespace: "alpha"
+    visibility: private
+    settings: {}
+  - name: project-alpha
+    create: true
+    namespace: "alpha"
+    visibility: private
+    description: "Alpha project in the dev group"
+    allow_merge_on_skipped_pipeline: true
+    auto_devops_enabled: false
+    default_branch: "main"
+    merge_requests_enabled: true
+    issues_enabled: true
+    container_expiration_policy:
+      - cadence: "7d"
+        enabled: true
+        keep_n: 5
+        name_regex_delete: ".*"
+        name_regex_keep: ""
+        older_than: "14d"
+    push_rules:
+      - author_email_regex: ".*@example.com"
+        prevent_secrets: true
+    timeouts:
+      - create: "30m"
+        delete: "30m"
+    settings:
+      access_tokens:
+        - name: "beta-token"
+          scopes: ["api"]
+          access_level: maintainer
+          expires_at: "2024-09-30"
+        - name: "gamma-token"
+          scopes: ["read_repository"]
+          access_level: maintainer
+          rotation_configuration:
+            expiration_days: 90
+            rotate_before_days: 10
+          expires_at: "2025-01-01"
+      approval_rules: []
+        # - name: "security-approval"
+        #   approvals_required: 2
+        #   user_emails: ["user1@email.com", "user2@email.com"] #Should exist in your system
+        #   group_names: ["roles/security-view"]
+        #   applies_to_all_protected_branches: true
+        #   disable_importing_default_any_approver_rule_on_create: false
+        #   rule_type: "regular"
+        # - name: "code-review-approval"
+        #   approvals_required: 1
+        #   group_names: ["roles/security-view"]
+      badges: []
+        # - name: "coverage"
+        #   link_url: "https://example.com/coverage.svg"
+        #   image_url: "https://example.com/coverage"
+        # - name: "build-status"
+        #   link_url: "https://example.com/build.svg"
+        #   image_url: "https://example.com/build"
+      custom_attributes: []
+        # - key: "environment"
+        #   value: "production"
+        # - key: "team"
+        #   value: "devops"
+      environments: []
+        # - name: "production"
+        #   external_url: "https://prod.example.com"
+        #   stop_before_destroy: true
+        # - name: "staging"
+        #   external_url: "https://staging.example.com"
+        #   stop_before_destroy: true
+      hooks: []
+        # - url: "https://example.com/hook1"
+        #   issues_events: true
+        #   merge_requests_events: true
+        #   pipeline_events: false
+        #   confidential_issues_events: false
+        # - url: "https://example.com/hook2"
+        #   deployment_events: true
+        #   job_events: false
+      issues: []
+        # - title: "Welcome Issue"
+        #   assignee_ids: [1, 2]
+        #   confidential: true
+        #   description: "Welcome to the project! Please familiarize yourself with the guidelines."
+        #   due_date: "2024-06-30"
+        #   state: "opened"
+        #   labels: ["onboarding", "important"]
+        # - title: "Bug Fix"
+        #   assignee_ids: [3]
+        #   due_date: "2024-07-15"
+        #   issue_type: "incident"
+        #   labels: ["bug", "urgent"]
+      job_token_scopes:
+        - target_project_id: "project-beta"
+        - target_project_id: "project-gamma"
+      labels:
+        - name: "bug1"
+          description: "Indicates a bug in the project"
+          color: "#FF0000"
+        - name: "feature1"
+          description: "New feature request"
+          color: "#00FF00"
+      level_mr_approvals:
+        - project: "project-alpha"
+          disable_overriding_approvers_per_merge_request: true
+          merge_requests_author_approval: false
+          merge_requests_disable_committers_approval: true
+          require_password_to_approve: true
+          reset_approvals_on_push: false
+          selective_code_owner_removals: true
+      memberships: []
+        # - user_email: "user1@emil.com"
+        #   access_level: developer
+        #   expires_at: "2024-12-31"
+        # - user_email: "user2@email.com"
+        #   access_level: maintainer
+      milestones: []
+        # - title: "Initial Release"
+        #   description: "First major release of the project."
+        #   due_date: "2024-06-30"
+        #   start_date: "2024-01-01"
+        #   state: "active"
+        # - title: "Bug Bash"
+        #   description: "A milestone to fix all critical bugs."
+        #   due_date: "2024-09-15"
+        #   start_date: "2024-07-01"
+      mirror:
+        null
+        # url: "https://github.com/example/repo.git"
+        # enabled: true
+        # keep_divergent_refs: false
+        # only_protected_branches: true
+      runners: []
+        # - runner_id: 12345
+        # - runner_id: 67890
+      protected_environments: []
+        # - environment: "production"
+        #   deploy_access_levels:
+        #     - access_level: developer
+        #       group: "roles/security-view"
+        #       user_email: "user1@emil.com"
+        #   approval_rules:
+        #     - access_level: "developer"
+        #       required_approvals: 1
+        #     - group: "dev"
+        #       required_approvals: 2
+        #     - user_email: "user2@emil.com"
+        # - environment: "staging"
+        #   deploy_access_levels:
+        #     - access_level: maintainer
+        #       group: "roles/security-view"
+      share_groups: []
+        # - group: "roles/security-view"
+        #   project: "project-alpha"
+        #   group_access: "developer"
+        # - group: "dev"
+        #   project: "project-alpha"
+        #   group_access: "maintainer"
+      variables:
+        - key: "VAR1"
+          value: "value1"
+          protected: true
+          masked: false
+          environment_scope: "production"
+          description: "A description for VAR1"
+          raw: false
+          variable_type: "env_var"
+        - key: "VAR2"
+          value: "maskedvalue2"
+          protected: false
+          masked: true
+          environment_scope: "*"
+          description: "A description for VAR2"
+          raw: true
+          variable_type: "file"
+      deploy_keys:
+        - title: "My Deploy Key"
+          key: "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEHE09hhSoOnkZ97BRVnNTOimqvBKM8GGODOxFL+nCxOGndHXRprUE29uYK7Qoy3tb1cWvWdkRn3g5F0ffAJ5k8= test1@secretive.SK-JH2KDCV7K7.local"
+          can_push: true
+        - title: "Read-Only Deploy Key"
+          key: "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBKRgKBko+kwYZ/c3/EEFpFCir693tVw0gbzKA/g7ViZkX8ZxUfM+eQB6p0aSkV/XJWszu7AB2ciCEM+//RNsLss= test2@secretive.SK-JH2KDCV7K7.local"
+          can_push: false
+      deploy_tokens:
+        - name: "read_token"
+          scopes: ["read_repository", "read_registry"]
+          expires_at: "2024-12-31T00:00:00.000Z"
+          username: "deploy_read_user"
+        - name: "write_token"
+          scopes: ["read_repository", "write_registry"]
+          expires_at: "2024-12-31T00:00:00.000Z"
+          username: "deploy_write_user"
+      pages_domains: []
+        # - domain: "domain.example.com"
+        #   key: "your-private-key-here"
+        #   certificate: "your-certificate-here"
+        #   auto_ssl_enabled: true
+        #   expired: false
+        # - domain: "domain2.example.com"
+        #   key: "another-private-key-here"
+        #   certificate: "another-certificate-here"
+        #   auto_ssl_enabled: false
+        #   expired: false
+      pipeline_schedules:
+        - description: "Daily Build"
+          ref: "refs/heads/main"
+          cron: "0 0 * * *"
+          active: true
+          cron_timezone: "UTC"
+          take_ownership: true
+        - description: "Weekly Backup"
+          ref: "refs/heads/main"
+          cron: "0 0 * * 0"
+          active: false
+          cron_timezone: "UTC"
+          take_ownership: false
+      pipeline_triggers:
+        - description: "Trigger for CI/CD pipeline"
+        - description: "Backup Trigger"
+      release_links: []
+        # - tag_name: "v1.0.0"
+        #   name: "Documentation"
+        #   url: "https://example.com/docs"
+        #   filepath: "/docs"
+        #   link_type: "other"
+        # - tag_name: "v1.0.0"
+        #   name: "Release Notes"
+        #   url: "https://example.com/release-notes"
+        #   filepath: "/release-notes"
+        #   link_type: "other"
+      branches: []
+        # - name: "feature-branch"
+        #   ref: "main"
+        # - name: "hotfix-branch"
+        #   ref: "main"
+      repository_files: []
+        # - file_path: "README.md"
+        #   branch: "main"
+        #   content: "# Welcome to Project Alpha"
+        #   author_email: "dev@example.com"
+        #   author_name: "Developer"
+        #   #commit_message: "Add README"
+        #   create_commit_message: "Initial commit for README"
+        #   delete_commit_message: "Remove README"
+        #   update_commit_message: "Update README"
+        #   encoding: "text"
+        #   execute_filemode: false
+        #   overwrite_on_create: true
+        #   start_branch: "main"
+        #   timeouts:
+        #     create: "5m"
+        #     delete: "5m"
+        #     update: "5m"
+        # - file_path: "docs/guide.md"
+        #   branch: "main"
+        #   content: "# User Guide"
+        #   author_email: "docwriter@example.com"
+        #   author_name: "Doc Writer"
+        #   commit_message: "Add User Guide"
+        #   #create_commit_message: "Initial commit for User Guide"
+        #   encoding: "text"
+        #   overwrite_on_create: false
+        #   start_branch: "main"
+        #   timeouts:
+        #     create: "3m"
+      integration_emails_on_push: null
+      #   recipients: "dev-team@example.com, qa-team@example.com"
+      #   branches_to_be_notified: "all"
+      #   disable_diffs: false
+      #   push_events: true
+      #   send_from_committer_email: false
+      #   tag_push_events: true
+      integration_external_wiki: null
+      #   external_wiki_url: "https://wiki.example.com/project-alpha"
+      integration_github: null
+      #   token: "ghp_exampleAlphaToken"
+      #   repository_url: "https://github.com/example/project-alpha"
+      #   static_context: false
+      integration_jira: null
+      #   url: "https://jira.example.com"
+      #   username: "jira_user_alpha"
+      #   password: "jira_password_alpha"
+      #   api_url: "https://jira.example.com/rest/api/2"
+      #   comment_on_event_enabled: true
+      #   commit_events: true
+      #   issues_events: true
+      #   jira_issue_transition_id: "31"
+      #   job_events: false
+      #   merge_requests_events: true
+      #   note_events: false
+      #   pipeline_events: true
+      #   project_key: "PA"
+      #   push_events: true
+      #   tag_push_events: false
+      integration_microsoft_teams: null
+      #   webhook: "https://outlook.office.com/webhook/project-alpha"
+      #   branches_to_be_notified: "all"
+      #   confidential_issues_events: true
+      #   confidential_note_events: false
+      #   issues_events: true
+      #   merge_requests_events: true
+      #   note_events: false
+      #   notify_only_broken_pipelines: false
+      #   pipeline_events: true
+      #   push_events: true
+      #   tag_push_events: false
+      #   wiki_page_events: true
+      integration_pipelines_email: null
+      #   recipients:
+      #     - "alpha-team@example.com"
+      #     - "devops-team@example.com"
+      #   notify_only_broken_pipelines: true
+      #   branches_to_be_notified: "all"
+      integration_slack: null
+      #   webhook: "https://hooks.slack.com/services/XXXXX/XXXXX/XXXXX"
+      #   branches_to_be_notified: "all"
+      #   confidential_issue_channel: "#confidential-issues"
+      #   confidential_issues_events: true
+      #   confidential_note_events: false
+      #   issue_channel: "#issues"
+      #   issues_events: true
+      #   merge_request_channel: "#merge-requests"
+      #   merge_requests_events: true
+      #   note_channel: "#notes"
+      #   note_events: true
+      #   notify_only_broken_pipelines: true
+      #   pipeline_channel: "#pipelines"
+      #   pipeline_events: true
+      #   push_channel: "#pushes"
+      #   push_events: true
+      #   tag_push_channel: "#tag-pushes"
+      #   tag_push_events: true
+      #   username: "GitLabBot"
+      #   wiki_page_channel: "#wiki-pages"
+      #   wiki_page_events: true
+    tags: []
+      #   - name: "v1.0.0"
+      #     ref: "main"
+      #     message: "Initial release"
+      #     protected: true
+      #     create_access_level: "developer"
+      #     allowed_to_create:
+      #       - group_id: "roles/security-view"
+      #       - user_id: "user@example.com"
+      #   - name: "v1.1.0"
+      #     ref: "main"
+      #     message: "Minor improvements"
+      #     protected: fals

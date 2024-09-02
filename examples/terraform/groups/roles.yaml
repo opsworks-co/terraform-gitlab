@@ -1,0 +1,40 @@
+groups:
+  - name: roles
+    create: true
+    settings:
+      visibility: private
+      description: "Parent group for user roles subgroups"
+
+  - name: gitlab-administrators
+    create: true
+    parent: roles
+    settings:
+      visibility: private
+      description: "Subgroup under roles"
+      saml_links:
+        - access_level: maintainer
+          saml_group_name: "gitlab-administrators"
+
+  - name: project-sre-review
+    create: true
+    parent: roles
+    settings:
+      visibility: private
+      description: "Another subgroup under roles"
+
+  - name: project-sre-dev
+    create: true
+    parent: roles
+    settings:
+      visibility: private
+      description: "Another subgroup under roles"
+
+  - name: security-view
+    create: true
+    parent: roles
+    settings:
+      visibility: private
+      description: "Another subgroup under roles"
+      saml_links:
+        - access_level: guest
+          saml_group_name: "security-view"

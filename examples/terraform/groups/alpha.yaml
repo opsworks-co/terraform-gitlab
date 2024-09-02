@@ -1,0 +1,111 @@
+groups:
+  - name: alpha
+    create: true
+    settings:
+      visibility: private
+      description: "Development top-level group"
+      project_creation_level: maintainer
+      subgroup_creation_level: owner
+      deploy_tokens: []
+        # - name: mc-token
+        #   scopes: ["read_registry"]
+        #   username: "mc_user"
+        # - name: dev-token
+        #   scopes: ["read_repository", "read_registry"]
+        #   expires_at: "2025-12-31T23:59:59Z"
+        #   username: "dev_user"
+      variables: []
+        # - key: "DEV_API_KEY"
+        #   value: "abc123"
+        #   protected: false
+        #   masked: true
+        #   environment_scope: "*"
+        #   description: "API key for development environment"
+        #   raw: false
+        #   variable_type: "env_var"
+        # - key: "MC_SECRET"
+        #   value: "def456"
+        #   protected: true
+        #   masked: true
+        #   environment_scope: "*"
+        #   description: "Secret for mc group"
+        #   raw: false
+        #   variable_type: "env_var"
+      protected_environments: []
+        # - environment: "production"
+        #   deploy_access_levels:
+        #     - access_level: maintainer
+        #   approval_rules:
+        #     - required_approvals: 1
+        #       access_level: maintainer
+      memberships: []
+        # - name: "user2"
+        #   access_level: 40
+        #   expires_at: "2024-02-01T00:00:00Z"
+        #   member_role_id: 2
+        #   skip_subresources_on_destroy: true
+        #   unassign_issuables_on_destroy: false
+      access_tokens: []
+        # - name: "Dev Access Token"
+        #   scopes: ["api", "read_repository"]
+        #   access_level: "maintainer"
+        #   expires_at: "2024-12-31"
+        #   rotation_configuration:
+        #     expiration_days: 90
+        #     rotate_before_days: 7
+      badges: []
+        # - link_url: "https://example.com/badge1"
+        #   image_url: "https://example.com/badge1.png"
+        #   name: "Badge 1"
+        # - link_url: "https://example.com/badge2"
+        #   image_url: "https://example.com/badge2.png"
+        #   name: "Badge 2"
+      custom_attributes: []
+        # - key: "attribute_key_1"
+        #   value: "attribute_value_1"
+        # - key: "attribute_key_2"
+        #   value: "attribute_value_2"
+      labels: []
+        # - name: "Bug"
+        #   description: "Indicates a bug in the project"
+        #   color: "#FF0000"
+        # - name: "Feature"
+        #   description: "Indicates a new feature"
+        #   color: "#00FF00"
+      epic_boards: []
+        # - name: "Development Epics"
+        #   lists:
+        #     - label_id: "Bug"
+        #     - label_id: "Feature"
+      hooks: []
+        # - url: "https://example.com/webhook1"
+        #   confidential_issues_events: true
+        #   confidential_note_events: false
+        #   custom_webhook_template: "template1"
+        #   deployment_events: true
+        #   enable_ssl_verification: true
+        #   issues_events: true
+        #   job_events: false
+        #   merge_requests_events: true
+        #   note_events: true
+        #   pipeline_events: true
+        #   push_events: true
+        #   push_events_branch_filter: "main"
+        #   releases_events: true
+        #   subgroup_events: false
+        #   tag_push_events: true
+        #   token: "example-token"
+        #   wiki_page_events: true
+      issue_boards: []
+        # - name: "Development Board"
+        #   labels: ["Bug", "Feature", "Enhancement"]
+        #   lists:
+        #     - label_id: "Bug"
+        #       position: 1
+        #     - label_id: "Feature"
+        #       position: 2
+        #   milestone_id: 123456
+      share_groups:
+        - share_group_id: "roles/security-view" # The group with which 'dev' will be shared
+          group_access: reporter # Access level for the shared group (e.g., 30 for Developer)
+          #expires_at: "2024-12-31" # Optional: Expiration date for the sharing"
