@@ -2,7 +2,7 @@ locals {
   # iam_role     = "arn:aws:iam::012345678912:role/terragrunt"
   # session_name = "gitlab-terragrunt-012345678912"
   # Modules version (sorted a-z)
-  terraform-gitlab = "0.1.0" # https://github.com/opsworks-co/terraform-gitlab
+  terraform-gitlab = "v0.1.0" # https://github.com/opsworks-co/terraform-gitlab
 }
 
 terraform_version_constraint  = "= 1.5.7"

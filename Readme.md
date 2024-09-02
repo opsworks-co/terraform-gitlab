@@ -111,8 +111,8 @@ The module provides the following outputs:
 
 You can find examples in the examples/ directory for different use cases, such as managing multiple groups, configuring integrations, and using different YAML configurations.
 
-- [terraform](https://github.com/opsworks-co/terraform-gitlab/examples/terraform) - How to use module with terraform
-- [terragrunt](https://github.com/opsworks-co/terraform-gitlab/examples/terragrunt) - How to use module with terragrunt
+- [terraform](https://github.com/opsworks-co/terraform-gitlab/tree/main/examples/terraform) - How to use module with terraform
+- [terragrunt](https://github.com/opsworks-co/terraform-gitlab/tree/main/examples/terragrunt) - How to use module with terragrunt
 
 
 ## Authors
@@ -121,4 +121,4 @@ Module is maintained by [Serhii Kaidalov](https://github.com/wiseelf).
 
 ## License
 
-Apache 2 Licensed. See [LICENSE](https://github.com/terraform-aws-modules/terraform-aws-iam/tree/master/LICENSE) for full details.
+Apache 2 Licensed. See [LICENSE](https://github.com/opsworks-co/terraform-gitlab/tree/main/LICENSE) for full details.
