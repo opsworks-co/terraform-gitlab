@@ -629,10 +629,10 @@ locals {
   ])
 
   # Map for parent group namespaces
-  parent_group_id_map = { for group in local.parent_groups : group.name => gitlab_group.parent_groups[group.name].id }
+  parent_group_id_map = { for group in local.parent_groups : group.name => gitlab_group.parent_groups[group.name].id if contains(local.parent_groups, gitlab_group.parent_groups[group.name]) }
 
   # Map for subgroup namespaces
-  subgroup_id_map = { for group in local.subgroups : "${group.parent}/${group.name}" => gitlab_group.subgroups["${group.parent}/${group.name}"].id }
+  subgroup_id_map = { for group in local.subgroups : "${group.parent}/${group.name}" => gitlab_group.subgroups["${group.parent}/${group.name}"].id if contains(local.subgroups, gitlab_group.subgroups["${group.parent}/${group.name}"]) }
 
   # Combined namespace map for easy lookup
   namespace_id_map = merge(local.parent_group_id_map, local.subgroup_id_map)
