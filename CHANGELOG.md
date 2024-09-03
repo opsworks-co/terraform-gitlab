@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2](https://github.com/opsworks-co/terraform-gitlab/compare/v0.2.1...v0.2.2) (2024-09-03)
+
+
+### Bug Fixes
+
+* Improve GitLab group sharing logic to handle parent groups and subgroups with proper key construction and ID resolution ([4d31ec2](https://github.com/opsworks-co/terraform-gitlab/commit/4d31ec294ca194c7aea723ede98e67612f72167f))
+
 ## [0.2.1](https://github.com/opsworks-co/terraform-gitlab/compare/v0.2.0...v0.2.1) (2024-09-03)
 
 
