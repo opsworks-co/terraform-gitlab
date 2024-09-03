@@ -4,6 +4,7 @@ resource "gitlab_group" "parent_groups" {
   for_each = {
     for group in local.parent_groups :
     group.name => group
+    if !contains(keys(group), "parent")
   }
 
   name             = each.value.name
@@ -60,6 +61,7 @@ resource "gitlab_group" "subgroups" {
   for_each = {
     for group in local.subgroups :
     "${group.parent}/${group.name}" => group
+    if contains(keys(group), "parent")
   }
 
   name             = each.value.name
@@ -631,23 +633,25 @@ locals {
     ] if contains(keys(lookup(group, "settings", {})), "share_groups")
   ]))
 
-  # Map for parent group namespaces
-  parent_group_id_map = { for group in local.parent_groups : group.name => gitlab_group.parent_groups[group.name].id if length(try(gitlab_group.parent_groups[group.name].id, "")) > 0 }
+  # Create a map of all groups by their full_path
+  group_id_map = {
+    for key, group in gitlab_group.parent_groups :
+    group.full_path => group.id
+  }
 
-  # Map for subgroup namespaces
-  subgroup_id_map = { for group in local.subgroups : "${group.parent}/${group.name}" => gitlab_group.subgroups["${group.parent}/${group.name}"].id if length(try(gitlab_group.subgroups["${group.parent}/${group.name}"].id, "")) > 0 }
+  subgroup_id_map = {
+    for key, subgroup in gitlab_group.subgroups :
+    subgroup.full_path => subgroup.id
+  }
 
-  # Combined namespace map for easy lookup
-  namespace_id_map = merge(local.parent_group_id_map, local.subgroup_id_map)
+  # Combined map for easy lookup by full_path
+  namespace_id_map = merge(local.group_id_map, local.subgroup_id_map)
+
   # Group by username for users; this should not have duplicates
   exists_users = { for user in data.gitlab_users.this.users : user.email => user }
 
   # Group by name for groups, allowing for duplicates
   exists_groups = { for group in data.gitlab_groups.this.groups : group.full_path => group... }
-
-  # Create a local mapping of projects by name to their data
-  projects_map = { for project in data.gitlab_projects.this.projects : project.name => project }
-
 }
 
 # Create GitLab projects dynamically
@@ -785,24 +789,18 @@ resource "gitlab_project" "projects" {
   wiki_enabled                            = lookup(each.value, "wiki_enabled", null)
 }
 
-# Lookup all projects created by Terraform to dynamically use them for creating access tokens
-data "gitlab_projects" "this" {
-  depends_on = [
-    gitlab_project.projects
-  ]
-}
-
 resource "gitlab_project_access_token" "access_tokens" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for token in lookup(project.settings, "access_tokens", []) : "${project.namespace}-${project.name}-${token.name}" => {
-        project_name = project.name
-        token        = token
+        project_name      = project.name
+        project_namespace = project.namespace
+        token             = token
       }
     }
   ]...)
 
-  project      = local.projects_map[each.value.project_name].id
+  project      = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   name         = each.value.token.name
   scopes       = each.value.token.scopes
   access_level = lookup(each.value.token, "access_level", "maintainer")
@@ -820,15 +818,16 @@ resource "gitlab_project_approval_rule" "approval_rules" {
     for project in var.gitlab_projects : {
       for rule in lookup(project.settings, "approval_rules", []) :
       "${project.namespace}-${project.name}-${rule.name}" => {
-        project_name = project.name
-        rule         = rule
+        project_name      = project.name
+        project_namespace = project.namespace
+        rule              = rule
       }
       if contains(["premium", "ultimate"], lower(var.tier))
     }
   ]...)
 
   # Correct the access to project ID
-  project = local.projects_map[each.value.project_name].id
+  project = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
 
   name               = each.value.rule.name
   approvals_required = each.value.rule.approvals_required
@@ -848,14 +847,15 @@ resource "gitlab_project_badge" "badges" {
     for project in var.gitlab_projects : {
       for badge in lookup(project.settings, "badges", []) :
       "${project.namespace}-${project.name}-${badge.name}" => {
-        project_name = project.name
-        badge        = badge
+        project_name      = project.name
+        project_namespace = project.namespace
+        badge             = badge
       }
     }
   ]...)
 
   # Use the correct project ID
-  project   = local.projects_map[each.value.project_name].id
+  project   = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   link_url  = each.value.badge.link_url
   image_url = each.value.badge.image_url
   name      = each.value.badge.name
@@ -866,14 +866,15 @@ resource "gitlab_project_custom_attribute" "custom_attributes" {
     for project in var.gitlab_projects : {
       for attr in lookup(project.settings, "custom_attributes", []) :
       "${project.namespace}-${project.name}-${attr.key}" => {
-        project_name = project.name
-        attribute    = attr
+        project_name      = project.name
+        project_namespace = project.namespace
+        attribute         = attr
       }
     }
   ]...)
 
   # Use the correct project ID
-  project = local.projects_map[each.value.project_name].id
+  project = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   key     = each.value.attribute.key
   value   = each.value.attribute.value
 }
@@ -883,14 +884,15 @@ resource "gitlab_project_environment" "environments" {
     for project in var.gitlab_projects : {
       for env in lookup(project.settings, "environments", []) :
       "${project.namespace}-${project.name}-${env.name}" => {
-        project_name = project.name
-        environment  = env
+        project_name      = project.name
+        project_namespace = project.namespace
+        environment       = env
       }
     }
   ]...)
 
   # Use the correct project ID
-  project             = local.projects_map[each.value.project_name].id
+  project             = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   name                = each.value.environment.name
   external_url        = lookup(each.value.environment, "external_url", null)
   stop_before_destroy = lookup(each.value.environment, "stop_before_destroy", false)
@@ -900,14 +902,15 @@ resource "gitlab_project_freeze_period" "freeze_periods" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for freeze_period in lookup(project.settings, "freeze_periods", []) : "${project.namespace}-${project.name}-${freeze_period.freeze_start}" => {
-        project_name  = project.name
-        freeze_period = freeze_period
+        project_name      = project.name
+        project_namespace = project.namespace
+        freeze_period     = freeze_period
       }
     }
   ]...)
 
   # Use the correct project ID
-  project       = local.projects_map[each.value.project_name].id
+  project       = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   freeze_start  = each.value.freeze_period.freeze_start
   freeze_end    = each.value.freeze_period.freeze_end
   cron_timezone = each.value.freeze_period.cron_timezone
@@ -918,15 +921,16 @@ resource "gitlab_project_hook" "hooks" {
     for project in var.gitlab_projects : {
       for hook in lookup(project.settings, "hooks", []) :
       "${project.namespace}-${project.name}-${hook.url}" => {
-        project_name = project.name
-        hook         = hook
+        project_name      = project.name
+        project_namespace = project.namespace
+        hook              = hook
       }
       if contains(["premium", "ultimate"], lower(var.tier))
     }
   ]...)
 
   # Use the correct project ID
-  project                    = local.projects_map[each.value.project_name].id
+  project                    = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   url                        = each.value.hook.url
   confidential_issues_events = lookup(each.value.hook, "confidential_issues_events", false)
   confidential_note_events   = lookup(each.value.hook, "confidential_note_events", false)
@@ -951,14 +955,15 @@ resource "gitlab_project_issue" "issues" {
     for project in var.gitlab_projects : {
       for issue in lookup(project.settings, "issues", []) :
       "${project.namespace}-${project.name}-${issue.title}" => {
-        project_name = project.name
-        issue        = issue
+        project_name      = project.name
+        project_namespace = project.namespace
+        issue             = issue
       }
     }
   ]...)
 
   # Use the correct project ID
-  project = local.projects_map[each.value.project_name].id
+  project = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   title   = each.value.issue.title
 
   # Dynamically assign all attributes from the issue
@@ -967,7 +972,7 @@ resource "gitlab_project_issue" "issues" {
   created_at                              = lookup(each.value.issue, "created_at", null)
   delete_on_destroy                       = lookup(each.value.issue, "delete_on_destroy", false)
   description                             = <<EOT
-  Welcome to the ${local.projects_map[each.value.project_name].name} project!
+  Welcome to the ${each.value.project_name} project!
   EOT
   discussion_locked                       = lookup(each.value.issue, "discussion_locked", false)
   discussion_to_resolve                   = lookup(each.value.issue, "discussion_to_resolve", null)
@@ -988,15 +993,16 @@ resource "gitlab_project_job_token_scope" "scopes" {
     for project in var.gitlab_projects : {
       for scope in lookup(project.settings, "job_token_scopes", []) :
       "${project.namespace}-${project.name}-${scope.target_project_id}" => {
-        project_name    = project.name
-        job_token_scope = scope
+        project_name      = project.name
+        project_namespace = project.namespace
+        job_token_scope   = scope
       }
     }
   ]...)
 
   # Use the correct project ID
-  project           = local.projects_map[each.value.project_name].id
-  target_project_id = local.exists_projects[each.value.job_token_scope.target_project_id].id
+  project           = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  target_project_id = gitlab_project.projects[each.value.job_token_scope.target_project_id].id
 }
 
 resource "gitlab_project_label" "labels" {
@@ -1004,14 +1010,15 @@ resource "gitlab_project_label" "labels" {
     for project in var.gitlab_projects : {
       for label in lookup(project.settings, "labels", []) :
       "${project.namespace}-${project.name}-${label.name}" => {
-        project_name = project.name
-        label        = label
+        project_name      = project.name
+        project_namespace = project.namespace
+        label             = label
       }
     }
   ]...)
 
   # Use the correct project ID
-  project     = local.projects_map[each.value.project_name].id
+  project     = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   name        = each.value.label.name
   description = lookup(each.value.label, "description", null)
   color       = lookup(each.value.label, "color", "#428BCA") # Default color if not specified
@@ -1023,6 +1030,7 @@ resource "gitlab_project_level_mr_approvals" "level_mr_approvals" {
       for approval in lookup(project.settings, "level_mr_approvals", []) :
       "${project.namespace}-${project.name}-${approval.project}" => {
         project_name       = project.name
+        project_namespace  = project.namespace
         level_mr_approvals = approval
       }
       if contains(["premium", "ultimate"], lower(var.tier))
@@ -1030,7 +1038,7 @@ resource "gitlab_project_level_mr_approvals" "level_mr_approvals" {
   ]...)
 
   # Use the correct project ID
-  project                                        = local.projects_map[each.value.project_name].id
+  project                                        = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   disable_overriding_approvers_per_merge_request = lookup(each.value.level_mr_approvals, "disable_overriding_approvers_per_merge_request", false)
   merge_requests_author_approval                 = lookup(each.value.level_mr_approvals, "merge_requests_author_approval", false)
   merge_requests_disable_committers_approval     = lookup(each.value.level_mr_approvals, "merge_requests_disable_committers_approval", false)
@@ -1044,14 +1052,15 @@ resource "gitlab_project_membership" "memberships" {
     for project in var.gitlab_projects : {
       for member in lookup(project.settings, "memberships", []) :
       "${project.namespace}-${project.name}-${member.user_email}" => {
-        project_name = project.name
-        member       = member
+        project_name      = project.name
+        project_namespace = project.namespace
+        member            = member
       }
     }
   ]...)
 
   # Use the correct project ID
-  project      = local.projects_map[each.value.project_name].id
+  project      = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   user_id      = contains(keys(local.exists_users), each.value.member.user_email) ? local.exists_users[each.value.member.user_email].id : null
   access_level = each.value.member.access_level
   expires_at   = lookup(each.value.member, "expires_at", null)
@@ -1062,14 +1071,15 @@ resource "gitlab_project_milestone" "milestones" {
     for project in var.gitlab_projects : {
       for milestone in lookup(project.settings, "milestones", []) :
       "${project.namespace}-${project.name}-${milestone.title}" => {
-        project_name = project.name
-        milestone    = milestone
+        project_name      = project.name
+        project_namespace = project.namespace
+        milestone         = milestone
       }
     }
   ]...)
 
   # Use the correct project ID
-  project     = local.projects_map[each.value.project_name].id
+  project     = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   title       = each.value.milestone.title
   description = lookup(each.value.milestone, "description", null)
   due_date    = lookup(each.value.milestone, "due_date", null)
@@ -1083,6 +1093,7 @@ resource "gitlab_project_mirror" "mirrors" {
       for mirror in [lookup(project.settings, "mirror", null)] :
       "${project.namespace}-${project.name}-mirror" => {
         project_name            = project.name
+        project_namespace       = project.namespace
         url                     = mirror.url
         enabled                 = lookup(mirror, "enabled", true)
         keep_divergent_refs     = lookup(mirror, "keep_divergent_refs", false)
@@ -1092,7 +1103,7 @@ resource "gitlab_project_mirror" "mirrors" {
     }
   ]...)
 
-  project                 = local.projects_map[each.value.project_name].id
+  project                 = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   url                     = each.value.url
   enabled                 = each.value.enabled
   keep_divergent_refs     = each.value.keep_divergent_refs
@@ -1104,8 +1115,9 @@ resource "gitlab_project_protected_environment" "environments" {
     for project in var.gitlab_projects : {
       for env in lookup(project.settings, "protected_environments", []) :
       "${project.namespace}-${project.name}-${env.environment}" => {
-        project_name = project.name
-        environment  = env
+        project_name      = project.name
+        project_namespace = project.namespace
+        environment       = env
       }
       if contains(["premium", "ultimate"], lower(var.tier))
     }
@@ -1113,7 +1125,7 @@ resource "gitlab_project_protected_environment" "environments" {
 
   # Use the correct project ID
   environment = each.value.environment.environment
-  project     = local.projects_map[each.value.project_name].id
+  project     = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
 
 
   # Dynamic block for access level
@@ -1160,13 +1172,14 @@ resource "gitlab_project_runner_enablement" "runners" {
     for project in var.gitlab_projects : {
       for runner in lookup(project.settings, "runners", []) :
       "${project.namespace}-${project.name}-${runner.runner_id}" => {
-        project_name = project.name
-        runner_id    = runner.runner_id
+        project_name      = project.name
+        project_namespace = project.namespace
+        runner_id         = runner.runner_id
       }
     }
   ]...)
 
-  project   = local.projects_map[each.value.project_name].id
+  project   = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   runner_id = each.value.runner_id
 }
 
@@ -1175,14 +1188,15 @@ resource "gitlab_project_share_group" "project_share_groups" {
     for project in var.gitlab_projects : {
       for sg in lookup(project.settings, "share_groups", []) :
       "${project.namespace}-${project.name}-${sg.group}" => {
-        project_name = project.name
-        group_name   = sg.group
-        group_access = lookup(sg, "group_access", null)
+        project_name      = project.name
+        project_namespace = project.namespace
+        group_name        = sg.group
+        group_access      = lookup(sg, "group_access", null)
       }
     }
   ]...)
 
-  project      = local.projects_map[each.value.project_name].id
+  project      = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   group_id     = contains(keys(local.exists_groups), each.value.group_name) ? local.exists_groups[each.value.group_name][0].group_id : null
   group_access = lookup(each.value, "group_access", "guest")
 }
@@ -1192,13 +1206,14 @@ resource "gitlab_project_variable" "variables" {
     for project in var.gitlab_projects : {
       for variable in lookup(project.settings, "variables", []) :
       "${project.namespace}-${project.name}-${variable.key}" => {
-        project_name = project.name
-        variable     = variable
+        project_name      = project.name
+        project_namespace = project.namespace
+        variable          = variable
       }
     }
   ]...)
 
-  project           = local.projects_map[each.value.project_name].id
+  project           = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   key               = each.value.variable.key
   value             = each.value.variable.value
   protected         = lookup(each.value.variable, "protected", false)
@@ -1214,13 +1229,14 @@ resource "gitlab_deploy_key" "keys" {
     for project in var.gitlab_projects : {
       for key in lookup(project.settings, "deploy_keys", []) :
       "${project.namespace}-${project.name}-${key.title}" => {
-        project_name = project.name
-        deploy_key   = key
+        project_name      = project.name
+        project_namespace = project.namespace
+        deploy_key        = key
       }
     }
   ]...)
 
-  project  = local.projects_map[each.value.project_name].id
+  project  = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   title    = each.value.deploy_key.title
   key      = each.value.deploy_key.key
   can_push = lookup(each.value.deploy_key, "can_push", false)
@@ -1231,13 +1247,14 @@ resource "gitlab_deploy_token" "tokens" {
     for project in var.gitlab_projects : {
       for token in lookup(project.settings, "deploy_tokens", []) :
       "${project.namespace}-${project.name}-${token.name}" => {
-        project_name = project.name
-        deploy_token = token
+        project_name      = project.name
+        project_namespace = project.namespace
+        deploy_token      = token
       }
     }
   ]...)
 
-  project    = local.projects_map[each.value.project_name].id
+  project    = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   name       = each.value.deploy_token.name
   scopes     = each.value.deploy_token.scopes
   expires_at = lookup(each.value.deploy_token, "expires_at", null)
@@ -1249,13 +1266,14 @@ resource "gitlab_pages_domain" "domains" {
     for project in var.gitlab_projects : {
       for domain in lookup(project.settings, "pages_domains", []) :
       "${project.namespace}-${project.name}-${domain.domain}" => {
-        project_name = project.name
-        domain_data  = domain
+        project_name      = project.name
+        project_namespace = project.namespace
+        domain_data       = domain
       }
     }
   ]...)
 
-  project          = local.projects_map[each.value.project_name].id
+  project          = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   domain           = each.value.domain_data.domain
   key              = each.value.domain_data.key
   certificate      = lookup(each.value.domain_data, "auto_ssl_enabled", false) == true ? null : each.value.domain_data.certificate
@@ -1269,12 +1287,13 @@ resource "gitlab_pipeline_schedule" "schedules" {
       for pipeline in lookup(project.settings, "pipeline_schedules", []) :
       "${project.namespace}-${project.name}-${pipeline.ref}-${pipeline.description}" => {
         project_name      = project.name
+        project_namespace = project.namespace
         pipeline_schedule = pipeline
       }
     }
   ]...)
 
-  project        = local.projects_map[each.value.project_name].id
+  project        = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   description    = each.value.pipeline_schedule.description
   ref            = each.value.pipeline_schedule.ref
   cron           = each.value.pipeline_schedule.cron
@@ -1288,13 +1307,14 @@ resource "gitlab_pipeline_trigger" "triggers" {
     for project in var.gitlab_projects : {
       for trigger in lookup(project.settings, "pipeline_triggers", []) :
       "${project.namespace}-${project.name}-${trigger.description}" => {
-        project_name = project.name
-        trigger      = trigger
+        project_name      = project.name
+        project_namespace = project.namespace
+        trigger           = trigger
       }
     }
   ]...)
 
-  project     = tostring(local.projects_map[each.value.project_name].id)
+  project     = tostring(gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id)
   description = each.value.trigger.description
 }
 
@@ -1303,13 +1323,14 @@ resource "gitlab_release_link" "links" {
     for project in var.gitlab_projects : {
       for release in lookup(project.settings, "release_links", []) :
       "${project.namespace}-${project.name}-${release.name}" => {
-        project_name = project.name
-        release_link = release
+        project_name      = project.name
+        project_namespace = project.namespace
+        release_link      = release
       }
     }
   ]...)
 
-  project   = tostring(local.projects_map[each.value.project_name].id)
+  project   = tostring(gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id)
   tag_name  = each.value.release_link.tag_name
   name      = each.value.release_link.name
   url       = each.value.release_link.url
@@ -1322,14 +1343,15 @@ resource "gitlab_branch" "branches" {
     for project in var.gitlab_projects : {
       for branch in lookup(project.settings, "branches", []) :
       "${project.namespace}-${project.name}-${branch.name}" => {
-        project_name = project.name
-        branch       = branch
+        project_name      = project.name
+        project_namespace = project.namespace
+        branch            = branch
       }
     }
   ]...)
 
   name    = each.value.branch.name
-  project = local.projects_map[each.value.project_name].id
+  project = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
   ref     = each.value.branch.ref
 }
 
@@ -1338,13 +1360,14 @@ resource "gitlab_repository_file" "files" {
     for project in var.gitlab_projects : {
       for file in lookup(project.settings, "repository_files", []) :
       "${project.namespace}-${project.name}-${file.file_path}" => {
-        project_name = project.name
-        file         = file
+        project_name      = project.name
+        project_namespace = project.namespace
+        file              = file
       }
     }
   ]...)
 
-  project               = tostring(local.projects_map[each.value.project_name].id)
+  project               = tostring(gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id)
   file_path             = each.value.file.file_path
   branch                = each.value.file.branch
   content               = each.value.file.content
@@ -1375,13 +1398,14 @@ resource "gitlab_integration_emails_on_push" "this" {
   for_each = {
     for project in var.gitlab_projects :
     "${project.namespace}-${project.name}-${lookup(project.settings.integration_emails_on_push, "recipients", "no-recipient")}" => {
-      project_name = project.name
-      integration  = lookup(project.settings, "integration_emails_on_push", null)
+      project_name      = project.name
+      project_namespace = project.namespace
+      integration       = lookup(project.settings, "integration_emails_on_push", null)
     }
     if lookup(project.settings, "integration_emails_on_push", null) != null
   }
 
-  project                   = lookup(local.projects_map, each.value.project_name, null) != null ? local.projects_map[each.value.project_name]["id"] : one(gitlab_project.projects[*].id)
+  project                   = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
   recipients                = each.value.integration.recipients
   branches_to_be_notified   = each.value.integration.branches_to_be_notified
   disable_diffs             = each.value.integration.disable_diffs
@@ -1394,13 +1418,14 @@ resource "gitlab_integration_external_wiki" "this" {
   for_each = {
     for project in var.gitlab_projects :
     "${project.namespace}-${project.name}-${lookup(project.settings.integration_external_wiki, "external_wiki_url", "no-url")}" => {
-      project_name = project.name
-      integration  = lookup(project.settings, "integration_external_wiki", null)
+      project_name      = project.name
+      project_namespace = project.namespace
+      integration       = lookup(project.settings, "integration_external_wiki", null)
     }
     if lookup(project.settings, "integration_external_wiki", null) != null
   }
 
-  project           = lookup(local.projects_map, each.value.project_name, null) != null ? local.projects_map[each.value.project_name]["id"] : one(gitlab_project.projects[*].id)
+  project           = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
   external_wiki_url = each.value.integration.external_wiki_url
 }
 
@@ -1408,13 +1433,14 @@ resource "gitlab_integration_github" "this" {
   for_each = {
     for project in var.gitlab_projects :
     "${project.namespace}-${project.name}-${lookup(project.settings.integration_github, "repository_url", "no-url")}" => {
-      project_name = project.name
-      integration  = lookup(project.settings, "integration_github", null)
+      project_name      = project.name
+      project_namespace = project.namespace
+      integration       = lookup(project.settings, "integration_github", null)
     }
     if lookup(project.settings, "integration_github", null) != null
   }
 
-  project        = lookup(local.projects_map, each.value.project_name, null) != null ? local.projects_map[each.value.project_name]["id"] : one(gitlab_project.projects[*].id)
+  project        = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
   token          = each.value.integration.token
   repository_url = each.value.integration.repository_url
   static_context = lookup(each.value.integration, "static_context", false)
@@ -1424,13 +1450,14 @@ resource "gitlab_integration_jira" "this" {
   for_each = {
     for project in var.gitlab_projects :
     "${project.namespace}-${project.name}-${lookup(project.settings.integration_jira, "url", "no-url")}" => {
-      project_name = project.name
-      integration  = lookup(project.settings, "integration_jira", null)
+      project_name      = project.name
+      project_namespace = project.namespace
+      integration       = lookup(project.settings, "integration_jira", null)
     }
     if lookup(project.settings, "integration_jira", null) != null
   }
 
-  project                  = lookup(local.projects_map, each.value.project_name, null) != null ? local.projects_map[each.value.project_name]["id"] : one(gitlab_project.projects[*].id)
+  project                  = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
   url                      = each.value.integration.url
   username                 = each.value.integration.username
   password                 = each.value.integration.password
@@ -1452,13 +1479,14 @@ resource "gitlab_integration_microsoft_teams" "this" {
   for_each = {
     for project in var.gitlab_projects :
     "${project.namespace}-${project.name}-${lookup(project.settings.integration_microsoft_teams, "webhook", "no-webhook")}" => {
-      project_name = project.name
-      integration  = lookup(project.settings, "integration_microsoft_teams", null)
+      project_name      = project.name
+      project_namespace = project.namespace
+      integration       = lookup(project.settings, "integration_microsoft_teams", null)
     }
     if lookup(project.settings, "integration_microsoft_teams", null) != null
   }
 
-  project                      = lookup(local.projects_map, each.value.project_name, null) != null ? local.projects_map[each.value.project_name]["id"] : one(gitlab_project.projects[*].id)
+  project                      = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
   webhook                      = each.value.integration.webhook
   branches_to_be_notified      = each.value.integration.branches_to_be_notified
   confidential_issues_events   = each.value.integration.confidential_issues_events
@@ -1477,13 +1505,14 @@ resource "gitlab_integration_pipelines_email" "this" {
   for_each = {
     for project in var.gitlab_projects :
     "${project.namespace}-${project.name}-${join("-", lookup(project.settings.integration_pipelines_email, "recipients", ["no-recipients"]))}" => {
-      project_name = project.name
-      integration  = lookup(project.settings, "integration_pipelines_email", null)
+      project_name      = project.name
+      project_namespace = project.namespace
+      integration       = lookup(project.settings, "integration_pipelines_email", null)
     }
     if lookup(project.settings, "integration_pipelines_email", null) != null
   }
 
-  project                      = lookup(local.projects_map, each.value.project_name, null) != null ? local.projects_map[each.value.project_name]["id"] : one(gitlab_project.projects[*].id)
+  project                      = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
   recipients                   = toset(each.value.integration.recipients)
   notify_only_broken_pipelines = each.value.integration.notify_only_broken_pipelines
   branches_to_be_notified      = each.value.integration.branches_to_be_notified
@@ -1493,13 +1522,14 @@ resource "gitlab_integration_slack" "this" {
   for_each = {
     for project in var.gitlab_projects :
     "${project.namespace}-${project.name}-${lookup(project.settings, "integration_slack", {}).webhook}" => {
-      project_name = project.name
-      integration  = lookup(project.settings, "integration_slack", null)
+      project_name      = project.name
+      project_namespace = project.namespace
+      integration       = lookup(project.settings, "integration_slack", null)
     }
     if lookup(project.settings, "integration_slack", null) != null
   }
 
-  project                      = lookup(local.projects_map, each.value.project_name, null) != null ? local.projects_map[each.value.project_name]["id"] : one(gitlab_project.projects[*].id)
+  project                      = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
   webhook                      = each.value.integration.webhook
   branches_to_be_notified      = each.value.integration.branches_to_be_notified
   confidential_issue_channel   = each.value.integration.confidential_issue_channel
@@ -1521,17 +1551,6 @@ resource "gitlab_integration_slack" "this" {
   username                     = each.value.integration.username
   wiki_page_channel            = each.value.integration.wiki_page_channel
   wiki_page_events             = each.value.integration.wiki_page_events
-}
-
-###
-data "gitlab_projects" "exists_projects" {
-  depends_on = [
-    gitlab_project.projects
-  ]
-}
-
-locals {
-  exists_projects = { for project in data.gitlab_projects.exists_projects.projects : project.name => project }
 }
 
 # Create GitLab Group Sharing
