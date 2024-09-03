@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1](https://github.com/opsworks-co/terraform-gitlab/compare/v0.2.0...v0.2.1) (2024-09-03)
+
+
+### Bug Fixes
+
+* Add project namespace to prevent name conflicts across different namespaces ([35ef1f0](https://github.com/opsworks-co/terraform-gitlab/commit/35ef1f00aaf8d67737f2aaf1aba532052d00ef4a))
+
 ## [0.2.0](https://github.com/opsworks-co/terraform-gitlab/compare/v0.1.1...v0.2.0) (2024-09-03)
 
 
