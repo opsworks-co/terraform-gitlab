@@ -1535,7 +1535,7 @@ locals {
 # Lookup the group id to be shared
 data "gitlab_group" "group_id" {
   for_each = {
-    for group in local.share_groups : group["group_id"] => group
+    for group in local.share_groups : group["group_id"] => group...
   }
 
   full_path = each.key
@@ -1546,7 +1546,7 @@ data "gitlab_group" "group_id" {
 # Lookup the share group id (the group to share with)
 data "gitlab_group" "share_group_id" {
   for_each = {
-    for group in local.share_groups : group["share_group_id"] => group
+    for group in local.share_groups : group["share_group_id"] => group...
   }
 
   full_path = each.key
