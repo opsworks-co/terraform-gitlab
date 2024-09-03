@@ -1531,37 +1531,14 @@ locals {
   exists_projects = { for project in data.gitlab_projects.exists_projects.projects : project.name => project }
 }
 
-
-# Lookup the group id to be shared
-data "gitlab_group" "group_id" {
-  for_each = {
-    for group in local.share_groups : group["group_id"] => group
-  }
-
-  full_path = each.key
-
-  depends_on = [gitlab_group.parent_groups, gitlab_group.subgroups]
-}
-
-# Lookup the share group id (the group to share with)
-data "gitlab_group" "share_group_id" {
-  for_each = {
-    for group in local.share_groups : group["share_group_id"] => group
-  }
-
-  full_path = each.key
-
-  depends_on = [gitlab_group.parent_groups, gitlab_group.subgroups]
-}
-
 # Create GitLab Group Sharing
 resource "gitlab_group_share_group" "this" {
   for_each = {
     for group in local.share_groups : "${group.group_id}-${group.share_group_id}" => group
   }
 
-  group_id       = data.gitlab_group.group_id[each.value.group_id].id
-  share_group_id = data.gitlab_group.share_group_id[each.value.share_group_id].id
+  group_id       = contains(keys(gitlab_group.parent_groups), each.value.group_id) ? gitlab_group.parent_groups[each.value.group_id].id : gitlab_group.subgroups[each.value.group_id].id
+  share_group_id = contains(keys(gitlab_group.parent_groups), each.value.share_group_id) ? gitlab_group.parent_groups[each.value.share_group_id].id : gitlab_group.subgroups[each.value.share_group_id].id
   group_access   = each.value.group_access
   expires_at     = lookup(each.value, "expires_at", null)
 }
