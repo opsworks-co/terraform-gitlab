@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0](https://github.com/opsworks-co/terraform-gitlab/compare/v0.2.2...v0.3.0) (2024-09-03)
+
+
+### Features
+
+* Prevent recreation of resources ([41d1765](https://github.com/opsworks-co/terraform-gitlab/commit/41d176574c1da996582decbd7ca8e014c323766f))
+
 ## [0.2.2](https://github.com/opsworks-co/terraform-gitlab/compare/v0.2.1...v0.2.2) (2024-09-03)
 
 
