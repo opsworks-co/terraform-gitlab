@@ -623,7 +623,10 @@ locals {
     for group in var.gitlab_groups : [
       for share in lookup(group, "settings", {})["share_groups"] : merge(
         share,
-        { group_id = group.name }
+        {
+          group_id = group.name,
+          parent   = lookup(group, "parent", "PARENT") # Ensure parent is included
+        }
       )
     ] if contains(keys(lookup(group, "settings", {})), "share_groups")
   ]))
@@ -1534,11 +1537,19 @@ locals {
 # Create GitLab Group Sharing
 resource "gitlab_group_share_group" "this" {
   for_each = {
-    for group in local.share_groups : "${group.group_id}-${group.share_group_id}" => group
+    for group in local.share_groups : "${group.parent}-${group.group_id}-${group.share_group_id}" => group
   }
 
-  group_id       = contains(keys(gitlab_group.parent_groups), each.value.group_id) ? gitlab_group.parent_groups[each.value.group_id].id : gitlab_group.subgroups[each.value.group_id].id
-  share_group_id = contains(keys(gitlab_group.parent_groups), each.value.share_group_id) ? gitlab_group.parent_groups[each.value.share_group_id].id : gitlab_group.subgroups[each.value.share_group_id].id
-  group_access   = each.value.group_access
-  expires_at     = lookup(each.value, "expires_at", null)
+  group_id = contains(keys(gitlab_group.parent_groups), each.value.group_id) ? gitlab_group.parent_groups[each.value.group_id].id : (
+    contains(keys(gitlab_group.subgroups), each.value.group_id)
+    ? gitlab_group.subgroups[each.value.group_id].id
+    : gitlab_group.subgroups["${each.value.parent}/${each.value.group_id}"].id
+  )
+  share_group_id = contains(keys(gitlab_group.parent_groups), each.value.share_group_id) ? gitlab_group.parent_groups[each.value.share_group_id].id : (
+    contains(keys(gitlab_group.subgroups), each.value.share_group_id)
+    ? gitlab_group.subgroups[each.value.share_group_id].id
+    : gitlab_group.subgroups["${each.value.parent}/${each.value.share_group_id}"].id
+  )
+  group_access = each.value.group_access
+  expires_at   = lookup(each.value, "expires_at", null)
 }
