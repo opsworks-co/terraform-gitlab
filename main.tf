@@ -792,7 +792,7 @@ data "gitlab_projects" "this" {
 resource "gitlab_project_access_token" "access_tokens" {
   for_each = merge([
     for project in var.gitlab_projects : {
-      for token in lookup(project.settings, "access_tokens", []) : "${project.name}-${token.name}" => {
+      for token in lookup(project.settings, "access_tokens", []) : "${project.namespace}-${project.name}-${token.name}" => {
         project_name = project.name
         token        = token
       }
@@ -816,7 +816,7 @@ resource "gitlab_project_approval_rule" "approval_rules" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for rule in lookup(project.settings, "approval_rules", []) :
-      "${project.name}-${rule.name}" => {
+      "${project.namespace}-${project.name}-${rule.name}" => {
         project_name = project.name
         rule         = rule
       }
@@ -844,7 +844,7 @@ resource "gitlab_project_badge" "badges" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for badge in lookup(project.settings, "badges", []) :
-      "${project.name}-${badge.name}" => {
+      "${project.namespace}-${project.name}-${badge.name}" => {
         project_name = project.name
         badge        = badge
       }
@@ -862,7 +862,7 @@ resource "gitlab_project_custom_attribute" "custom_attributes" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for attr in lookup(project.settings, "custom_attributes", []) :
-      "${project.name}-${attr.key}" => {
+      "${project.namespace}-${project.name}-${attr.key}" => {
         project_name = project.name
         attribute    = attr
       }
@@ -879,7 +879,7 @@ resource "gitlab_project_environment" "environments" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for env in lookup(project.settings, "environments", []) :
-      "${project.name}-${env.name}" => {
+      "${project.namespace}-${project.name}-${env.name}" => {
         project_name = project.name
         environment  = env
       }
@@ -896,7 +896,7 @@ resource "gitlab_project_environment" "environments" {
 resource "gitlab_project_freeze_period" "freeze_periods" {
   for_each = merge([
     for project in var.gitlab_projects : {
-      for freeze_period in lookup(project.settings, "freeze_periods", []) : "${project.name}-${freeze_period.freeze_start}" => {
+      for freeze_period in lookup(project.settings, "freeze_periods", []) : "${project.namespace}-${project.name}-${freeze_period.freeze_start}" => {
         project_name  = project.name
         freeze_period = freeze_period
       }
@@ -914,7 +914,7 @@ resource "gitlab_project_hook" "hooks" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for hook in lookup(project.settings, "hooks", []) :
-      "${project.name}-${hook.url}" => {
+      "${project.namespace}-${project.name}-${hook.url}" => {
         project_name = project.name
         hook         = hook
       }
@@ -947,7 +947,7 @@ resource "gitlab_project_issue" "issues" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for issue in lookup(project.settings, "issues", []) :
-      "${project.name}-${issue.title}" => {
+      "${project.namespace}-${project.name}-${issue.title}" => {
         project_name = project.name
         issue        = issue
       }
@@ -984,7 +984,7 @@ resource "gitlab_project_job_token_scope" "scopes" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for scope in lookup(project.settings, "job_token_scopes", []) :
-      "${project.name}-${scope.target_project_id}" => {
+      "${project.namespace}-${project.name}-${scope.target_project_id}" => {
         project_name    = project.name
         job_token_scope = scope
       }
@@ -1000,7 +1000,7 @@ resource "gitlab_project_label" "labels" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for label in lookup(project.settings, "labels", []) :
-      "${project.name}-${label.name}" => {
+      "${project.namespace}-${project.name}-${label.name}" => {
         project_name = project.name
         label        = label
       }
@@ -1018,7 +1018,7 @@ resource "gitlab_project_level_mr_approvals" "level_mr_approvals" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for approval in lookup(project.settings, "level_mr_approvals", []) :
-      "${project.name}-${approval.project}" => {
+      "${project.namespace}-${project.name}-${approval.project}" => {
         project_name       = project.name
         level_mr_approvals = approval
       }
@@ -1040,7 +1040,7 @@ resource "gitlab_project_membership" "memberships" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for member in lookup(project.settings, "memberships", []) :
-      "${project.name}-${member.user_email}" => {
+      "${project.namespace}-${project.name}-${member.user_email}" => {
         project_name = project.name
         member       = member
       }
@@ -1058,7 +1058,7 @@ resource "gitlab_project_milestone" "milestones" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for milestone in lookup(project.settings, "milestones", []) :
-      "${project.name}-${milestone.title}" => {
+      "${project.namespace}-${project.name}-${milestone.title}" => {
         project_name = project.name
         milestone    = milestone
       }
@@ -1078,7 +1078,7 @@ resource "gitlab_project_mirror" "mirrors" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for mirror in [lookup(project.settings, "mirror", null)] :
-      "${project.name}-mirror" => {
+      "${project.namespace}-${project.name}-mirror" => {
         project_name            = project.name
         url                     = mirror.url
         enabled                 = lookup(mirror, "enabled", true)
@@ -1100,7 +1100,7 @@ resource "gitlab_project_protected_environment" "environments" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for env in lookup(project.settings, "protected_environments", []) :
-      "${project.name}-${env.environment}" => {
+      "${project.namespace}-${project.name}-${env.environment}" => {
         project_name = project.name
         environment  = env
       }
@@ -1156,7 +1156,7 @@ resource "gitlab_project_runner_enablement" "runners" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for runner in lookup(project.settings, "runners", []) :
-      "${project.name}-${runner.runner_id}" => {
+      "${project.namespace}-${project.name}-${runner.runner_id}" => {
         project_name = project.name
         runner_id    = runner.runner_id
       }
@@ -1171,7 +1171,7 @@ resource "gitlab_project_share_group" "project_share_groups" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for sg in lookup(project.settings, "share_groups", []) :
-      "${project.name}-${sg.group}" => {
+      "${project.namespace}-${project.name}-${sg.group}" => {
         project_name = project.name
         group_name   = sg.group
         group_access = lookup(sg, "group_access", null)
@@ -1188,7 +1188,7 @@ resource "gitlab_project_variable" "variables" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for variable in lookup(project.settings, "variables", []) :
-      "${project.name}-${variable.key}" => {
+      "${project.namespace}-${project.name}-${variable.key}" => {
         project_name = project.name
         variable     = variable
       }
@@ -1210,7 +1210,7 @@ resource "gitlab_deploy_key" "keys" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for key in lookup(project.settings, "deploy_keys", []) :
-      "${project.name}-${key.title}" => {
+      "${project.namespace}-${project.name}-${key.title}" => {
         project_name = project.name
         deploy_key   = key
       }
@@ -1227,7 +1227,7 @@ resource "gitlab_deploy_token" "tokens" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for token in lookup(project.settings, "deploy_tokens", []) :
-      "${project.name}-${token.name}" => {
+      "${project.namespace}-${project.name}-${token.name}" => {
         project_name = project.name
         deploy_token = token
       }
@@ -1245,7 +1245,7 @@ resource "gitlab_pages_domain" "domains" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for domain in lookup(project.settings, "pages_domains", []) :
-      "${project.name}-${domain.domain}" => {
+      "${project.namespace}-${project.name}-${domain.domain}" => {
         project_name = project.name
         domain_data  = domain
       }
@@ -1264,7 +1264,7 @@ resource "gitlab_pipeline_schedule" "schedules" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for pipeline in lookup(project.settings, "pipeline_schedules", []) :
-      "${project.name}-${pipeline.ref}-${pipeline.description}" => {
+      "${project.namespace}-${project.name}-${pipeline.ref}-${pipeline.description}" => {
         project_name      = project.name
         pipeline_schedule = pipeline
       }
@@ -1284,7 +1284,7 @@ resource "gitlab_pipeline_trigger" "triggers" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for trigger in lookup(project.settings, "pipeline_triggers", []) :
-      "${project.name}-${trigger.description}" => {
+      "${project.namespace}-${project.name}-${trigger.description}" => {
         project_name = project.name
         trigger      = trigger
       }
@@ -1299,7 +1299,7 @@ resource "gitlab_release_link" "links" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for release in lookup(project.settings, "release_links", []) :
-      "${project.name}-${release.name}" => {
+      "${project.namespace}-${project.name}-${release.name}" => {
         project_name = project.name
         release_link = release
       }
@@ -1318,7 +1318,7 @@ resource "gitlab_branch" "branches" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for branch in lookup(project.settings, "branches", []) :
-      "${project.name}-${branch.name}" => {
+      "${project.namespace}-${project.name}-${branch.name}" => {
         project_name = project.name
         branch       = branch
       }
@@ -1334,7 +1334,7 @@ resource "gitlab_repository_file" "files" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for file in lookup(project.settings, "repository_files", []) :
-      "${project.name}-${file.file_path}" => {
+      "${project.namespace}-${project.name}-${file.file_path}" => {
         project_name = project.name
         file         = file
       }
@@ -1371,7 +1371,7 @@ resource "gitlab_repository_file" "files" {
 resource "gitlab_integration_emails_on_push" "this" {
   for_each = {
     for project in var.gitlab_projects :
-    "${project.name}-${lookup(project.settings.integration_emails_on_push, "recipients", "no-recipient")}" => {
+    "${project.namespace}-${project.name}-${lookup(project.settings.integration_emails_on_push, "recipients", "no-recipient")}" => {
       project_name = project.name
       integration  = lookup(project.settings, "integration_emails_on_push", null)
     }
@@ -1390,7 +1390,7 @@ resource "gitlab_integration_emails_on_push" "this" {
 resource "gitlab_integration_external_wiki" "this" {
   for_each = {
     for project in var.gitlab_projects :
-    "${project.name}-${lookup(project.settings.integration_external_wiki, "external_wiki_url", "no-url")}" => {
+    "${project.namespace}-${project.name}-${lookup(project.settings.integration_external_wiki, "external_wiki_url", "no-url")}" => {
       project_name = project.name
       integration  = lookup(project.settings, "integration_external_wiki", null)
     }
@@ -1404,7 +1404,7 @@ resource "gitlab_integration_external_wiki" "this" {
 resource "gitlab_integration_github" "this" {
   for_each = {
     for project in var.gitlab_projects :
-    "${project.name}-${lookup(project.settings.integration_github, "repository_url", "no-url")}" => {
+    "${project.namespace}-${project.name}-${lookup(project.settings.integration_github, "repository_url", "no-url")}" => {
       project_name = project.name
       integration  = lookup(project.settings, "integration_github", null)
     }
@@ -1420,7 +1420,7 @@ resource "gitlab_integration_github" "this" {
 resource "gitlab_integration_jira" "this" {
   for_each = {
     for project in var.gitlab_projects :
-    "${project.name}-${lookup(project.settings.integration_jira, "url", "no-url")}" => {
+    "${project.namespace}-${project.name}-${lookup(project.settings.integration_jira, "url", "no-url")}" => {
       project_name = project.name
       integration  = lookup(project.settings, "integration_jira", null)
     }
@@ -1448,7 +1448,7 @@ resource "gitlab_integration_jira" "this" {
 resource "gitlab_integration_microsoft_teams" "this" {
   for_each = {
     for project in var.gitlab_projects :
-    "${project.name}-${lookup(project.settings.integration_microsoft_teams, "webhook", "no-webhook")}" => {
+    "${project.namespace}-${project.name}-${lookup(project.settings.integration_microsoft_teams, "webhook", "no-webhook")}" => {
       project_name = project.name
       integration  = lookup(project.settings, "integration_microsoft_teams", null)
     }
@@ -1473,7 +1473,7 @@ resource "gitlab_integration_microsoft_teams" "this" {
 resource "gitlab_integration_pipelines_email" "this" {
   for_each = {
     for project in var.gitlab_projects :
-    "${project.name}-${join("-", lookup(project.settings.integration_pipelines_email, "recipients", ["no-recipients"]))}" => {
+    "${project.namespace}-${project.name}-${join("-", lookup(project.settings.integration_pipelines_email, "recipients", ["no-recipients"]))}" => {
       project_name = project.name
       integration  = lookup(project.settings, "integration_pipelines_email", null)
     }
@@ -1489,7 +1489,7 @@ resource "gitlab_integration_pipelines_email" "this" {
 resource "gitlab_integration_slack" "this" {
   for_each = {
     for project in var.gitlab_projects :
-    "${project.name}-${lookup(project.settings, "integration_slack", {}).webhook}" => {
+    "${project.namespace}-${project.name}-${lookup(project.settings, "integration_slack", {}).webhook}" => {
       project_name = project.name
       integration  = lookup(project.settings, "integration_slack", null)
     }
