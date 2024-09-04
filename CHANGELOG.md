@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0](https://github.com/opsworks-co/terraform-gitlab/compare/v0.3.0...v1.0.0) (2024-09-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* Refactor GitLab group management
+
+### Features
+
+* Refactor GitLab group management ([b382989](https://github.com/opsworks-co/terraform-gitlab/commit/b3829899af3eb004b3936e33ad8498f89e440767))
+
 ## [0.3.0](https://github.com/opsworks-co/terraform-gitlab/compare/v0.2.2...v0.3.0) (2024-09-03)
 
 
