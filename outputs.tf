@@ -13,17 +13,17 @@ output "subgroups_group_ids" {
 
 output "project_ids" {
   description = "List of created GitLab project IDs."
-  value       = [for project in gitlab_project.projects : project.id]
+  value       = [for project in gitlab_project.this : project.id]
 }
 
 output "deploy_token_ids" {
   description = "IDs of created deploy tokens."
-  value       = [for token in gitlab_deploy_token.tokens : token.id]
+  value       = [for token in gitlab_deploy_token.this : token.id]
 }
 
 output "pipeline_schedule_ids" {
   description = "IDs of created pipeline schedules."
-  value       = [for schedule in gitlab_pipeline_schedule.schedules : schedule.id]
+  value       = [for schedule in gitlab_pipeline_schedule.this : schedule.id]
 }
 
 output "integration_slack_ids" {
