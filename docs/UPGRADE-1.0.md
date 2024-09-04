@@ -10,6 +10,7 @@ This update refactors the management of GitLab groups and access tokens in the T
 2. Simplified Access Token Management:
    - Consolidated the creation of GitLab group access tokens into a single resource definition.
    - Removed redundant definitions and optimized the access token creation process.
+3. Fixed projects update when new group is added.
 
 ## ⚠️ Important Update ⚠️
 
