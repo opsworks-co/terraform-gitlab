@@ -2,7 +2,7 @@
 # Create Parent Groups
 resource "gitlab_group" "parent_groups" {
   for_each = {
-    for group in local.parent_groups :
+    for group in var.gitlab_groups :
     group.name => group
     if !contains(keys(group), "parent")
   }
@@ -59,7 +59,7 @@ resource "gitlab_group" "parent_groups" {
 # Create Subgroups
 resource "gitlab_group" "subgroups" {
   for_each = {
-    for group in local.subgroups :
+    for group in var.gitlab_groups :
     "${group.parent}/${group.name}" => group
     if contains(keys(group), "parent")
   }
@@ -99,21 +99,28 @@ resource "gitlab_group" "subgroups" {
   }
 }
 
-# Create GitLab Group Access Tokens for Parent Groups
-resource "gitlab_group_access_token" "parent_group_tokens" {
+# Create GitLab Group Access Tokens
+resource "gitlab_group_access_token" "this" {
   for_each = merge([
-    for group in local.parent_groups : {
-      for token in lookup(group.settings, "access_tokens", []) : "${group.name}-${token.name}" => {
-        group_name = group.name
+    for group in var.gitlab_groups : {
+      for token in lookup(group.settings, "access_tokens", []) : (
+        contains(keys(group), "parent")
+        ? "${group.parent}/${group.name}-${token.name}" # Use parent in the key if it exists
+        : "${group.name}-${token.name}"                 # Fallback to group name only if no parent
+        ) => {
+        group_name = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+        parent     = lookup(group, "parent", null)
         token      = token
       }
     }
   ]...)
 
-  group        = gitlab_group.parent_groups[each.value.group_name].id
+  group = each.value.parent == null ? gitlab_group.parent_groups[each.value.group_name].id : gitlab_group.subgroups[each.value.group_name].id
+
   name         = each.value.token.name
   scopes       = each.value.token.scopes
   access_level = each.value.token.access_level
+
   # Conditionally set either expires_at or rotation_configuration
   expires_at = lookup(each.value.token, "expires_at", null)
 
@@ -123,186 +130,116 @@ resource "gitlab_group_access_token" "parent_group_tokens" {
   } : null
 }
 
-# Create GitLab Group Access Tokens for Subgroups
-resource "gitlab_group_access_token" "subgroup_tokens" {
+# Create GitLab Group Badges
+resource "gitlab_group_badge" "this" {
   for_each = merge([
-    for group in local.subgroups : {
-      for token in lookup(group.settings, "access_tokens", []) : "${group.parent}/${group.name}-${token.name}" => {
-        group_name = "${group.parent}/${group.name}"
-        token      = token
-      }
-    }
-  ]...)
-
-  group        = gitlab_group.subgroups[each.value.group_name].id
-  name         = each.value.token.name
-  scopes       = each.value.token.scopes
-  access_level = each.value.token.access_level
-  # Conditionally set either expires_at or rotation_configuration
-  expires_at = lookup(each.value.token, "expires_at", null)
-
-  rotation_configuration = each.value.token.expires_at == null && each.value.token.rotation_configuration != null ? {
-    expiration_days    = try(each.value.token.rotation_configuration.expiration_days, null)
-    rotate_before_days = try(each.value.token.rotation_configuration.rotate_before_days, null)
-  } : null
-}
-
-# Create GitLab Group Badges for Parent Groups
-resource "gitlab_group_badge" "parent_group_badges" {
-  for_each = merge([
-    for group in local.parent_groups : {
-      for badge in lookup(group.settings, "badges", []) : "${group.name}-${badge.link_url}" => {
-        group_name = group.name
+    for group in var.gitlab_groups : {
+      for badge in lookup(group.settings, "badges", []) : (
+        contains(keys(group), "parent")
+        ? "${group.parent}/${group.name}-${badge.link_url}" # Use parent in the key if it exists
+        : "${group.name}-${badge.link_url}"                 # Fallback to group name only if no parent
+        ) => {
+        group_name = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+        parent     = lookup(group, "parent", null)
         badge      = badge
       }
     }
   ]...)
 
-  group     = gitlab_group.parent_groups[each.value.group_name].id
+  group     = each.value.parent == null ? gitlab_group.parent_groups[each.value.group_name].id : gitlab_group.subgroups[each.value.group_name].id
   link_url  = each.value.badge.link_url
   image_url = each.value.badge.image_url
   name      = each.value.badge.name
 }
 
-# Create GitLab Group Badges for Subgroups
-resource "gitlab_group_badge" "subgroup_badges" {
+# Create GitLab Group Custom Attributes
+resource "gitlab_group_custom_attribute" "this" {
   for_each = merge([
-    for group in local.subgroups : {
-      for badge in lookup(group.settings, "badges", []) : "${group.parent}/${group.name}-${badge.link_url}" => {
-        group_name = "${group.parent}/${group.name}"
-        badge      = badge
-      }
-    }
-  ]...)
-
-  group     = gitlab_group.subgroups[each.value.group_name].id
-  link_url  = each.value.badge.link_url
-  image_url = each.value.badge.image_url
-  name      = each.value.badge.name
-}
-
-# Create GitLab Group Custom Attributes for Parent Groups
-resource "gitlab_group_custom_attribute" "parent_group_attributes" {
-  for_each = merge([
-    for group in local.parent_groups : {
-      for attr in lookup(group.settings, "custom_attributes", []) : "${group.name}-${attr.key}" => {
-        group_name = group.name
+    for group in var.gitlab_groups : {
+      for attr in lookup(group.settings, "custom_attributes", []) : (
+        contains(keys(group), "parent")
+        ? "${group.parent}/${group.name}-${attr.key}" # Include parent in the key if it exists
+        : "${group.name}-${attr.key}"                 # Fallback to group name only if no parent
+        ) => {
+        group_name = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+        parent     = lookup(group, "parent", null)
         attribute  = attr
       }
     }
   ]...)
 
-  group = gitlab_group.parent_groups[each.value.group_name].id
+  group = each.value.parent == null ? gitlab_group.parent_groups[each.value.group_name].id : gitlab_group.subgroups[each.value.group_name].id
   key   = each.value.attribute.key
   value = each.value.attribute.value
 }
 
-# Create GitLab Group Custom Attributes for Subgroups
-resource "gitlab_group_custom_attribute" "subgroup_attributes" {
+# Create GitLab Group Labels
+resource "gitlab_group_label" "this" {
   for_each = merge([
-    for group in local.subgroups : {
-      for attr in lookup(group.settings, "custom_attributes", []) : "${group.parent}/${group.name}-${attr.key}" => {
-        group_name = "${group.parent}/${group.name}"
-        attribute  = attr
-      }
-    }
-  ]...)
-
-  group = gitlab_group.subgroups[each.value.group_name].id
-  key   = each.value.attribute.key
-  value = each.value.attribute.value
-}
-
-# Create GitLab Group Labels for Parent Groups
-resource "gitlab_group_label" "parent_group_labels" {
-  for_each = merge([
-    for group in local.parent_groups : {
-      for label in lookup(group.settings, "labels", []) : "${group.name}-${label.name}" => {
-        group_name = group.name
+    for group in var.gitlab_groups : {
+      for label in lookup(group.settings, "labels", []) : (
+        contains(keys(group), "parent")
+        ? "${group.parent}/${group.name}-${label.name}" # Include parent in the key if it exists
+        : "${group.name}-${label.name}"                 # Fallback to group name only if no parent
+        ) => {
+        group_name = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+        parent     = lookup(group, "parent", null)
         label      = label
       }
     }
   ]...)
 
-  group       = gitlab_group.parent_groups[each.value.group_name].id
+  group       = each.value.parent == null ? gitlab_group.parent_groups[each.value.group_name].id : gitlab_group.subgroups[each.value.group_name].id
   name        = each.value.label.name
   description = lookup(each.value.label, "description", null)
   color       = each.value.label.color
 }
 
-# Create GitLab Group Labels for Subgroups
-resource "gitlab_group_label" "subgroup_labels" {
+# Create GitLab Group Epic Boards
+resource "gitlab_group_epic_board" "this" {
   for_each = merge([
-    for group in local.subgroups : {
-      for label in lookup(group.settings, "labels", []) : "${group.parent}/${group.name}-${label.name}" => {
-        group_name = "${group.parent}/${group.name}"
-        label      = label
-      }
-    }
-  ]...)
-
-  group       = gitlab_group.subgroups[each.value.group_name].id
-  name        = each.value.label.name
-  description = lookup(each.value.label, "description", null)
-  color       = each.value.label.color
-}
-
-# Create GitLab Group Epic Boards for Parent Groups
-resource "gitlab_group_epic_board" "parent_group_epic_boards" {
-  for_each = merge([
-    for group in local.parent_groups : {
-      for board in lookup(group.settings, "epic_boards", []) : "${group.name}-${board.name}" => {
-        group_name = group.name
+    for group in var.gitlab_groups : {
+      for board in lookup(group.settings, "epic_boards", []) : (
+        contains(keys(group), "parent")
+        ? "${group.parent}/${group.name}-${board.name}" # Include parent in the key if it exists
+        : "${group.name}-${board.name}"                 # Fallback to group name only if no parent
+        ) => {
+        group_name = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+        parent     = lookup(group, "parent", null)
         board      = board
       }
     }
   ]...)
 
   name  = each.value.board.name
-  group = gitlab_group.parent_groups[each.value.group_name].id
+  group = each.value.parent == null ? gitlab_group.parent_groups[each.value.group_name].id : gitlab_group.subgroups[each.value.group_name].id
+
   dynamic "lists" {
     for_each = length(each.value.board.lists) > 0 ? toset(each.value.board.lists) : []
     iterator = rule
     content {
-      label_id = lookup(local.parent_group_label_map, rule.value.label_id, null)
+      label_id = lookup(local.label_map, rule.value.label_id, null)
     }
   }
 }
 
-# Create GitLab Group Epic Boards for Subgroups
-resource "gitlab_group_epic_board" "subgroup_epic_boards" {
+# Create GitLab Group Hooks
+resource "gitlab_group_hook" "this" {
   for_each = merge([
-    for group in local.subgroups : {
-      for board in lookup(group.settings, "epic_boards", []) : "${group.parent}/${group.name}-${board.name}" => {
-        group_name = "${group.parent}/${group.name}"
-        board      = board
-      }
-    }
-  ]...)
-
-  name  = each.value.board.name
-  group = gitlab_group.subgroups[each.value.group_name].id
-  dynamic "lists" {
-    for_each = length(each.value.board.lists) > 0 ? toset(each.value.board.lists) : []
-    iterator = rule
-    content {
-      label_id = lookup(local.subgroup_label_map, rule.value.label_id, null)
-    }
-  }
-}
-
-# Create GitLab Group Hooks for Parent Groups
-resource "gitlab_group_hook" "parent_group_hooks" {
-  for_each = merge([
-    for group in local.parent_groups : {
-      for hook in lookup(group.settings, "hooks", []) : "${group.name}-${hook.url}" => {
-        group_name = group.name
+    for group in var.gitlab_groups : {
+      for hook in lookup(group.settings, "hooks", []) : (
+        contains(keys(group), "parent")
+        ? "${group.parent}/${group.name}-${hook.url}" # Include parent in the key if it exists
+        : "${group.name}-${hook.url}"                 # Fallback to group name only if no parent
+        ) => {
+        group_name = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+        parent     = lookup(group, "parent", null)
         hook       = hook
       }
     }
   ]...)
 
-  group                      = gitlab_group.parent_groups[each.value.group_name].id
+  group                      = each.value.parent == null ? gitlab_group.parent_groups[each.value.group_name].id : gitlab_group.subgroups[each.value.group_name].id
   url                        = each.value.hook.url
   confidential_issues_events = lookup(each.value.hook, "confidential_issues_events", false)
   confidential_note_events   = lookup(each.value.hook, "confidential_note_events", false)
@@ -323,82 +260,30 @@ resource "gitlab_group_hook" "parent_group_hooks" {
   wiki_page_events           = lookup(each.value.hook, "wiki_page_events", false)
 }
 
-# Create GitLab Group Hooks for Subgroups
-resource "gitlab_group_hook" "subgroup_hooks" {
+# Create GitLab Group Issue Boards
+resource "gitlab_group_issue_board" "this" {
   for_each = merge([
-    for group in local.subgroups : {
-      for hook in lookup(group.settings, "hooks", []) : "${group.parent}/${group.name}-${hook.url}" => {
-        group_name = "${group.parent}/${group.name}"
-        hook       = hook
-      }
-    }
-  ]...)
-
-  group                      = gitlab_group.subgroups[each.value.group_name].id
-  url                        = each.value.hook.url
-  confidential_issues_events = lookup(each.value.hook, "confidential_issues_events", false)
-  confidential_note_events   = lookup(each.value.hook, "confidential_note_events", false)
-  custom_webhook_template    = lookup(each.value.hook, "custom_webhook_template", null)
-  deployment_events          = lookup(each.value.hook, "deployment_events", false)
-  enable_ssl_verification    = lookup(each.value.hook, "enable_ssl_verification", true)
-  issues_events              = lookup(each.value.hook, "issues_events", false)
-  job_events                 = lookup(each.value.hook, "job_events", false)
-  merge_requests_events      = lookup(each.value.hook, "merge_requests_events", false)
-  note_events                = lookup(each.value.hook, "note_events", false)
-  pipeline_events            = lookup(each.value.hook, "pipeline_events", false)
-  push_events                = lookup(each.value.hook, "push_events", false)
-  push_events_branch_filter  = lookup(each.value.hook, "push_events_branch_filter", null)
-  releases_events            = lookup(each.value.hook, "releases_events", false)
-  subgroup_events            = lookup(each.value.hook, "subgroup_events", false)
-  tag_push_events            = lookup(each.value.hook, "tag_push_events", false)
-  token                      = lookup(each.value.hook, "token", null)
-  wiki_page_events           = lookup(each.value.hook, "wiki_page_events", false)
-}
-
-# Create GitLab Group Issue Boards for Parent Groups
-resource "gitlab_group_issue_board" "parent_group_issue_boards" {
-  for_each = merge([
-    for group in local.parent_groups : {
-      for board in lookup(group.settings, "issue_boards", []) : "${group.name}-${board.name}" => {
-        group_name = group.name
+    for group in var.gitlab_groups : {
+      for board in lookup(group.settings, "issue_boards", []) : (
+        contains(keys(group), "parent")
+        ? "${group.parent}/${group.name}-${board.name}" # Include parent in the key if it exists
+        : "${group.name}-${board.name}"                 # Fallback to group name only if no parent
+        ) => {
+        group_name = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+        parent     = lookup(group, "parent", null)
         board      = board
       }
     }
   ]...)
 
   name   = each.value.board.name
-  group  = gitlab_group.parent_groups[each.value.group_name].id
+  group  = each.value.parent == null ? gitlab_group.parent_groups[each.value.group_name].id : gitlab_group.subgroups[each.value.group_name].id
   labels = each.value.board.labels
   dynamic "lists" {
     for_each = length(each.value.board.lists) > 0 ? toset(each.value.board.lists) : []
     iterator = rule
     content {
-      label_id = lookup(local.parent_group_label_map, rule.value.label_id, null)
-      position = rule.value.position
-    }
-  }
-  milestone_id = lookup(each.value.board, "milestone_id", null)
-}
-
-# Create GitLab Group Issue Boards for Subgroups
-resource "gitlab_group_issue_board" "subgroup_issue_boards" {
-  for_each = merge([
-    for group in local.subgroups : {
-      for board in lookup(group.settings, "issue_boards", []) : "${group.parent}/${group.name}-${board.name}" => {
-        group_name = "${group.parent}/${group.name}"
-        board      = board
-      }
-    }
-  ]...)
-
-  name   = each.value.board.name
-  group  = gitlab_group.subgroups[each.value.group_name].id
-  labels = each.value.board.labels
-  dynamic "lists" {
-    for_each = length(each.value.board.lists) > 0 ? toset(each.value.board.lists) : []
-    iterator = rule
-    content {
-      label_id = lookup(local.subgroup_label_map, rule.value.label_id, null)
+      label_id = lookup(local.label_map, rule.value.label_id, null)
       position = rule.value.position
     }
   }
@@ -408,7 +293,7 @@ resource "gitlab_group_issue_board" "subgroup_issue_boards" {
 # Fetch User Data for Group Memberships
 data "gitlab_user" "membership_user" {
   for_each = merge([
-    for group in concat(local.parent_groups, local.subgroups) : {
+    for group in var.gitlab_groups : {
       for member in lookup(group.settings, "memberships", []) : member.user_id => member
     }
   ]...)
@@ -416,18 +301,23 @@ data "gitlab_user" "membership_user" {
   username = each.value.user_id
 }
 
-# Create GitLab Group Memberships for Parent Groups
-resource "gitlab_group_membership" "parent_group_memberships" {
+# Create GitLab Group Memberships
+resource "gitlab_group_membership" "this" {
   for_each = merge([
-    for group in local.parent_groups : {
-      for member in lookup(group.settings, "memberships", []) : "${group.name}-${member.user_id}" => {
-        group_name = group.name
+    for group in var.gitlab_groups : {
+      for member in lookup(group.settings, "memberships", []) : (
+        contains(keys(group), "parent")
+        ? "${group.parent}/${group.name}-${member.user_id}" # Include parent in the key if it exists
+        : "${group.name}-${member.user_id}"                 # Fallback to group name only if no parent
+        ) => {
+        group_name = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+        parent     = lookup(group, "parent", null)
         member     = member
       }
     }
   ]...)
 
-  group_id                      = gitlab_group.parent_groups[each.value.group_name].id
+  group_id                      = each.value.parent == null ? gitlab_group.parent_groups[each.value.group_name].id : gitlab_group.subgroups[each.value.group_name].id
   access_level                  = each.value.member.access_level
   user_id                       = data.gitlab_user.membership_user[each.value.member.user_id].id
   expires_at                    = lookup(each.value.member, "expires_at", null)
@@ -436,104 +326,67 @@ resource "gitlab_group_membership" "parent_group_memberships" {
   unassign_issuables_on_destroy = lookup(each.value.member, "unassign_issuables_on_destroy", false)
 }
 
-# Create GitLab Group Memberships for Subgroups
-resource "gitlab_group_membership" "subgroup_memberships" {
+# Create GitLab Protected Environments
+resource "gitlab_group_protected_environment" "this" {
   for_each = merge([
-    for group in local.subgroups : {
-      for member in lookup(group.settings, "memberships", []) : "${group.parent}/${group.name}-${member.user_id}" => {
-        group_name = "${group.parent}/${group.name}"
-        member     = member
-      }
-    }
-  ]...)
-
-  group_id                      = gitlab_group.subgroups[each.value.group_name].id
-  access_level                  = each.value.member.access_level
-  user_id                       = data.gitlab_user.membership_user[each.value.member.user_id].id
-  expires_at                    = lookup(each.value.member, "expires_at", null)
-  member_role_id                = contains(["premium", "ultimate"], lower(var.tier)) ? lookup(each.value.member, "member_role_id", null) : null
-  skip_subresources_on_destroy  = lookup(each.value.member, "skip_subresources_on_destroy", false)
-  unassign_issuables_on_destroy = lookup(each.value.member, "unassign_issuables_on_destroy", false)
-}
-
-# Create GitLab Protected Environments for Parent Groups
-resource "gitlab_group_protected_environment" "parent_group_protected_environments" {
-  for_each = merge([
-    for group in local.parent_groups : {
-      for env in lookup(group.settings, "protected_environments", []) : "${group.name}-${env.environment}" => {
-        group_name = group.name
+    for group in var.gitlab_groups : {
+      for env in lookup(group.settings, "protected_environments", []) : (
+        contains(keys(group), "parent")
+        ? "${group.parent}/${group.name}-${env.environment}" # Include parent in the key if it exists
+        : "${group.name}-${env.environment}"                 # Fallback to group name only if no parent
+        ) => {
+        group_name = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+        parent     = lookup(group, "parent", null)
         env        = env
       }
     }
   ]...)
 
-  group                = gitlab_group.parent_groups[each.value.group_name].id
+  group                = each.value.parent == null ? gitlab_group.parent_groups[each.value.group_name].id : gitlab_group.subgroups[each.value.group_name].id
   deploy_access_levels = each.value.env.deploy_access_levels
   environment          = each.value.env.environment
   approval_rules       = each.value.env.approval_rules
 }
 
-# Create GitLab Protected Environments for Subgroups
-resource "gitlab_group_protected_environment" "subgroup_protected_environments" {
-  for_each = merge([
-    for group in local.subgroups : {
-      for env in lookup(group.settings, "protected_environments", []) : "${group.parent}/${group.name}-${env.environment}" => {
-        group_name = "${group.parent}/${group.name}"
-        env        = env
-      }
-    }
-  ]...)
 
-  group                = gitlab_group.subgroups[each.value.group_name].id
-  deploy_access_levels = each.value.env.deploy_access_levels
-  environment          = each.value.env.environment
-  approval_rules       = each.value.env.approval_rules
-}
-
-# Create GitLab SAML Links for Parent Groups
-resource "gitlab_group_saml_link" "parent_group_saml_links" {
+# Create GitLab SAML Links
+resource "gitlab_group_saml_link" "this" {
   for_each = merge([
-    for group in local.parent_groups : {
-      for saml_link in lookup(group.settings, "saml_links", []) : "${group.name}-${saml_link.saml_group_name}" => {
-        group_name = group.name
+    for group in var.gitlab_groups : {
+      for saml_link in lookup(group.settings, "saml_links", []) : (
+        contains(keys(group), "parent")
+        ? "${group.parent}/${group.name}-${saml_link.saml_group_name}" # Use parent in the key if it exists
+        : "${group.name}-${saml_link.saml_group_name}"                 # Fallback to group name only if no parent
+        ) => {
+        group_name = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+        parent     = lookup(group, "parent", null)
         saml_link  = saml_link
       }
     }
   ]...)
 
-  group           = each.value.group_name
+  group           = each.value.parent == null ? gitlab_group.parent_groups[each.value.group_name].id : gitlab_group.subgroups[each.value.group_name].id
   access_level    = each.value.saml_link.access_level
   saml_group_name = each.value.saml_link.saml_group_name
 }
 
-# Create GitLab SAML Links for Subgroups
-resource "gitlab_group_saml_link" "subgroup_saml_links" {
+# Create GitLab Group Variables
+resource "gitlab_group_variable" "this" {
   for_each = merge([
-    for group in local.subgroups : {
-      for saml_link in lookup(group.settings, "saml_links", []) : "${group.parent}/${group.name}-${saml_link.saml_group_name}" => {
-        group_name = "${group.parent}/${group.name}"
-        saml_link  = saml_link
-      }
-    }
-  ]...)
-
-  group           = each.value.group_name
-  access_level    = each.value.saml_link.access_level
-  saml_group_name = each.value.saml_link.saml_group_name
-}
-
-# Create GitLab Group Variables for Parent Groups
-resource "gitlab_group_variable" "parent_group_variables" {
-  for_each = merge([
-    for group in local.parent_groups : {
-      for variable in lookup(group.settings, "variables", []) : "${group.name}-${variable.key}" => {
-        group_name = group.name
+    for group in var.gitlab_groups : {
+      for variable in lookup(group.settings, "variables", []) : (
+        contains(keys(group), "parent")
+        ? "${group.parent}/${group.name}-${variable.key}" # Include parent in the key if it exists
+        : "${group.name}-${variable.key}"                 # Fallback to group name only if no parent
+        ) => {
+        group_name = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+        parent     = lookup(group, "parent", null)
         variable   = variable
       }
     }
   ]...)
 
-  group             = gitlab_group.parent_groups[each.value.group_name].id
+  group             = each.value.parent == null ? gitlab_group.parent_groups[each.value.group_name].id : gitlab_group.subgroups[each.value.group_name].id
   key               = each.value.variable.key
   value             = each.value.variable.value
   protected         = lookup(each.value.variable, "protected", false)
@@ -543,65 +396,6 @@ resource "gitlab_group_variable" "parent_group_variables" {
   raw               = lookup(each.value.variable, "raw", false)
   variable_type     = lookup(each.value.variable, "variable_type", "env_var")
 }
-
-# Create GitLab Group Variables for Subgroups
-resource "gitlab_group_variable" "subgroup_variables" {
-  for_each = merge([
-    for group in local.subgroups : {
-      for variable in lookup(group.settings, "variables", []) : "${group.parent}/${group.name}-${variable.key}" => {
-        group_name = "${group.parent}/${group.name}"
-        variable   = variable
-      }
-    }
-  ]...)
-
-  group             = gitlab_group.subgroups[each.value.group_name].id
-  key               = each.value.variable.key
-  value             = each.value.variable.value
-  protected         = lookup(each.value.variable, "protected", false)
-  masked            = lookup(each.value.variable, "masked", false)
-  environment_scope = lookup(each.value.variable, "environment_scope", "*")
-  description       = lookup(each.value.variable, "description", null)
-  raw               = lookup(each.value.variable, "raw", false)
-  variable_type     = lookup(each.value.variable, "variable_type", "env_var")
-}
-
-# Create GitLab Deploy Tokens for Parent Groups
-resource "gitlab_deploy_token" "parent_group_tokens" {
-  for_each = merge([
-    for group in local.parent_groups : {
-      for token in lookup(group.settings, "deploy_tokens", []) : "${group.name}-${token.name}" => {
-        group_name = group.name
-        token      = token
-      }
-    }
-  ]...)
-
-  group      = gitlab_group.parent_groups[each.value.group_name].id
-  name       = each.value.token.name
-  scopes     = each.value.token.scopes
-  expires_at = lookup(each.value.token, "expires_at", null)
-  username   = lookup(each.value.token, "username", null)
-}
-
-# Create GitLab Deploy Tokens for Subgroups
-resource "gitlab_deploy_token" "subgroup_tokens" {
-  for_each = merge([
-    for group in local.subgroups : {
-      for token in lookup(group.settings, "deploy_tokens", []) : "${group.parent}/${group.name}-${token.name}" => {
-        group_name = "${group.parent}/${group.name}"
-        token      = token
-      }
-    }
-  ]...)
-
-  group      = gitlab_group.subgroups[each.value.group_name].id
-  name       = each.value.token.name
-  scopes     = each.value.token.scopes
-  expires_at = lookup(each.value.token, "expires_at", null)
-  username   = lookup(each.value.token, "username", null)
-}
-
 
 # Data sources to retrieve users and groups from GitLab
 data "gitlab_users" "this" {}
@@ -610,15 +404,7 @@ data "gitlab_groups" "this" {}
 
 # Locals to map users and groups for dynamic references
 locals {
-
-  # Separate parent groups and subgroups
-  parent_groups = [for group in var.gitlab_groups : group if !contains(keys(group), "parent")]
-
-  subgroups = [for group in var.gitlab_groups : group if contains(keys(group), "parent")]
-
-  parent_group_label_map = { for group_name, label in gitlab_group_label.parent_group_labels : label.name => label.label_id }
-
-  subgroup_label_map = { for group_name, label in gitlab_group_label.subgroup_labels : label.name => label.label_id }
+  label_map = { for group_name, label in gitlab_group_label.this : label.name => label.label_id }
 
   # Extract `share_groups` configurations from each group and remove duplicates
   share_groups = distinct(flatten([
@@ -627,25 +413,11 @@ locals {
         share,
         {
           group_id = group.name,
-          parent   = lookup(group, "parent", "PARENT") # Ensure parent is included
+          parent   = lookup(group, "parent", null) # Ensure parent is included
         }
       )
     ] if contains(keys(lookup(group, "settings", {})), "share_groups")
   ]))
-
-  # Create a map of all groups by their full_path
-  group_id_map = {
-    for key, group in gitlab_group.parent_groups :
-    group.full_path => group.id
-  }
-
-  subgroup_id_map = {
-    for key, subgroup in gitlab_group.subgroups :
-    subgroup.full_path => subgroup.id
-  }
-
-  # Combined map for easy lookup by full_path
-  namespace_id_map = merge(local.group_id_map, local.subgroup_id_map)
 
   # Group by username for users; this should not have duplicates
   exists_users = { for user in data.gitlab_users.this.users : user.email => user }
@@ -655,16 +427,23 @@ locals {
 }
 
 # Create GitLab projects dynamically
-resource "gitlab_project" "projects" {
+resource "gitlab_project" "this" {
   for_each = {
     for project in var.gitlab_projects :
     "${project.namespace}/${project.name}" => project
   }
 
-  name                                             = each.value.name
-  description                                      = lookup(each.value, "description", null)
-  visibility_level                                 = lookup(each.value, "visibility", "private")
-  namespace_id                                     = lookup(local.namespace_id_map, each.value.namespace, null)
+  name             = each.value.name
+  description      = lookup(each.value, "description", null)
+  visibility_level = lookup(each.value, "visibility", "private")
+
+  namespace_id = try(
+    local.exists_groups[each.value.namespace][0].group_id,
+    gitlab_group.subgroups[each.value.namespace].id,
+    gitlab_group.parent_groups[each.value.namespace].id,
+    null
+  )
+
   allow_merge_on_skipped_pipeline                  = lookup(each.value, "allow_merge_on_skipped_pipeline", null)
   analytics_access_level                           = lookup(each.value, "analytics_access_level", null)
   archive_on_destroy                               = lookup(each.value, "archive_on_destroy", null)
@@ -789,7 +568,7 @@ resource "gitlab_project" "projects" {
   wiki_enabled                            = lookup(each.value, "wiki_enabled", null)
 }
 
-resource "gitlab_project_access_token" "access_tokens" {
+resource "gitlab_project_access_token" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for token in lookup(project.settings, "access_tokens", []) : "${project.namespace}-${project.name}-${token.name}" => {
@@ -800,7 +579,7 @@ resource "gitlab_project_access_token" "access_tokens" {
     }
   ]...)
 
-  project      = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project      = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   name         = each.value.token.name
   scopes       = each.value.token.scopes
   access_level = lookup(each.value.token, "access_level", "maintainer")
@@ -813,7 +592,7 @@ resource "gitlab_project_access_token" "access_tokens" {
   } : null
 }
 
-resource "gitlab_project_approval_rule" "approval_rules" {
+resource "gitlab_project_approval_rule" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for rule in lookup(project.settings, "approval_rules", []) :
@@ -827,7 +606,7 @@ resource "gitlab_project_approval_rule" "approval_rules" {
   ]...)
 
   # Correct the access to project ID
-  project = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
 
   name               = each.value.rule.name
   approvals_required = each.value.rule.approvals_required
@@ -842,7 +621,7 @@ resource "gitlab_project_approval_rule" "approval_rules" {
   rule_type = lookup(each.value.rule, "rule_type", null)
 }
 
-resource "gitlab_project_badge" "badges" {
+resource "gitlab_project_badge" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for badge in lookup(project.settings, "badges", []) :
@@ -855,13 +634,13 @@ resource "gitlab_project_badge" "badges" {
   ]...)
 
   # Use the correct project ID
-  project   = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project   = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   link_url  = each.value.badge.link_url
   image_url = each.value.badge.image_url
   name      = each.value.badge.name
 }
 
-resource "gitlab_project_custom_attribute" "custom_attributes" {
+resource "gitlab_project_custom_attribute" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for attr in lookup(project.settings, "custom_attributes", []) :
@@ -874,12 +653,12 @@ resource "gitlab_project_custom_attribute" "custom_attributes" {
   ]...)
 
   # Use the correct project ID
-  project = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   key     = each.value.attribute.key
   value   = each.value.attribute.value
 }
 
-resource "gitlab_project_environment" "environments" {
+resource "gitlab_project_environment" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for env in lookup(project.settings, "environments", []) :
@@ -892,13 +671,13 @@ resource "gitlab_project_environment" "environments" {
   ]...)
 
   # Use the correct project ID
-  project             = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project             = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   name                = each.value.environment.name
   external_url        = lookup(each.value.environment, "external_url", null)
   stop_before_destroy = lookup(each.value.environment, "stop_before_destroy", false)
 }
 
-resource "gitlab_project_freeze_period" "freeze_periods" {
+resource "gitlab_project_freeze_period" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for freeze_period in lookup(project.settings, "freeze_periods", []) : "${project.namespace}-${project.name}-${freeze_period.freeze_start}" => {
@@ -910,13 +689,13 @@ resource "gitlab_project_freeze_period" "freeze_periods" {
   ]...)
 
   # Use the correct project ID
-  project       = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project       = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   freeze_start  = each.value.freeze_period.freeze_start
   freeze_end    = each.value.freeze_period.freeze_end
   cron_timezone = each.value.freeze_period.cron_timezone
 }
 
-resource "gitlab_project_hook" "hooks" {
+resource "gitlab_project_hook" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for hook in lookup(project.settings, "hooks", []) :
@@ -930,7 +709,7 @@ resource "gitlab_project_hook" "hooks" {
   ]...)
 
   # Use the correct project ID
-  project                    = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project                    = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   url                        = each.value.hook.url
   confidential_issues_events = lookup(each.value.hook, "confidential_issues_events", false)
   confidential_note_events   = lookup(each.value.hook, "confidential_note_events", false)
@@ -950,7 +729,7 @@ resource "gitlab_project_hook" "hooks" {
   wiki_page_events           = lookup(each.value.hook, "wiki_page_events", false)
 }
 
-resource "gitlab_project_issue" "issues" {
+resource "gitlab_project_issue" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for issue in lookup(project.settings, "issues", []) :
@@ -963,7 +742,7 @@ resource "gitlab_project_issue" "issues" {
   ]...)
 
   # Use the correct project ID
-  project = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   title   = each.value.issue.title
 
   # Dynamically assign all attributes from the issue
@@ -988,7 +767,7 @@ resource "gitlab_project_issue" "issues" {
   weight                                  = lookup(each.value.issue, "weight", null)
 }
 
-resource "gitlab_project_job_token_scope" "scopes" {
+resource "gitlab_project_job_token_scope" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for scope in lookup(project.settings, "job_token_scopes", []) :
@@ -1001,11 +780,11 @@ resource "gitlab_project_job_token_scope" "scopes" {
   ]...)
 
   # Use the correct project ID
-  project           = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
-  target_project_id = gitlab_project.projects[each.value.job_token_scope.target_project_id].id
+  project           = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
+  target_project_id = gitlab_project.this[each.value.job_token_scope.target_project_id].id
 }
 
-resource "gitlab_project_label" "labels" {
+resource "gitlab_project_label" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for label in lookup(project.settings, "labels", []) :
@@ -1018,13 +797,13 @@ resource "gitlab_project_label" "labels" {
   ]...)
 
   # Use the correct project ID
-  project     = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project     = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   name        = each.value.label.name
   description = lookup(each.value.label, "description", null)
   color       = lookup(each.value.label, "color", "#428BCA") # Default color if not specified
 }
 
-resource "gitlab_project_level_mr_approvals" "level_mr_approvals" {
+resource "gitlab_project_level_mr_approvals" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for approval in lookup(project.settings, "level_mr_approvals", []) :
@@ -1038,7 +817,7 @@ resource "gitlab_project_level_mr_approvals" "level_mr_approvals" {
   ]...)
 
   # Use the correct project ID
-  project                                        = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project                                        = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   disable_overriding_approvers_per_merge_request = lookup(each.value.level_mr_approvals, "disable_overriding_approvers_per_merge_request", false)
   merge_requests_author_approval                 = lookup(each.value.level_mr_approvals, "merge_requests_author_approval", false)
   merge_requests_disable_committers_approval     = lookup(each.value.level_mr_approvals, "merge_requests_disable_committers_approval", false)
@@ -1047,7 +826,7 @@ resource "gitlab_project_level_mr_approvals" "level_mr_approvals" {
   selective_code_owner_removals                  = lookup(each.value.level_mr_approvals, "selective_code_owner_removals", false)
 }
 
-resource "gitlab_project_membership" "memberships" {
+resource "gitlab_project_membership" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for member in lookup(project.settings, "memberships", []) :
@@ -1060,13 +839,13 @@ resource "gitlab_project_membership" "memberships" {
   ]...)
 
   # Use the correct project ID
-  project      = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project      = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   user_id      = contains(keys(local.exists_users), each.value.member.user_email) ? local.exists_users[each.value.member.user_email].id : null
   access_level = each.value.member.access_level
   expires_at   = lookup(each.value.member, "expires_at", null)
 }
 
-resource "gitlab_project_milestone" "milestones" {
+resource "gitlab_project_milestone" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for milestone in lookup(project.settings, "milestones", []) :
@@ -1079,7 +858,7 @@ resource "gitlab_project_milestone" "milestones" {
   ]...)
 
   # Use the correct project ID
-  project     = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project     = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   title       = each.value.milestone.title
   description = lookup(each.value.milestone, "description", null)
   due_date    = lookup(each.value.milestone, "due_date", null)
@@ -1087,7 +866,7 @@ resource "gitlab_project_milestone" "milestones" {
   state       = lookup(each.value.milestone, "state", "active") # Default state if not specified
 }
 
-resource "gitlab_project_mirror" "mirrors" {
+resource "gitlab_project_mirror" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for mirror in [lookup(project.settings, "mirror", null)] :
@@ -1103,14 +882,14 @@ resource "gitlab_project_mirror" "mirrors" {
     }
   ]...)
 
-  project                 = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project                 = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   url                     = each.value.url
   enabled                 = each.value.enabled
   keep_divergent_refs     = each.value.keep_divergent_refs
   only_protected_branches = each.value.only_protected_branches
 }
 
-resource "gitlab_project_protected_environment" "environments" {
+resource "gitlab_project_protected_environment" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for env in lookup(project.settings, "protected_environments", []) :
@@ -1125,7 +904,7 @@ resource "gitlab_project_protected_environment" "environments" {
 
   # Use the correct project ID
   environment = each.value.environment.environment
-  project     = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project     = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
 
 
   # Dynamic block for access level
@@ -1167,7 +946,7 @@ resource "gitlab_project_protected_environment" "environments" {
   ])
 }
 
-resource "gitlab_project_runner_enablement" "runners" {
+resource "gitlab_project_runner_enablement" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for runner in lookup(project.settings, "runners", []) :
@@ -1179,11 +958,11 @@ resource "gitlab_project_runner_enablement" "runners" {
     }
   ]...)
 
-  project   = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project   = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   runner_id = each.value.runner_id
 }
 
-resource "gitlab_project_share_group" "project_share_groups" {
+resource "gitlab_project_share_group" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for sg in lookup(project.settings, "share_groups", []) :
@@ -1196,12 +975,12 @@ resource "gitlab_project_share_group" "project_share_groups" {
     }
   ]...)
 
-  project      = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project      = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   group_id     = contains(keys(local.exists_groups), each.value.group_name) ? local.exists_groups[each.value.group_name][0].group_id : null
   group_access = lookup(each.value, "group_access", "guest")
 }
 
-resource "gitlab_project_variable" "variables" {
+resource "gitlab_project_variable" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for variable in lookup(project.settings, "variables", []) :
@@ -1213,7 +992,7 @@ resource "gitlab_project_variable" "variables" {
     }
   ]...)
 
-  project           = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project           = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   key               = each.value.variable.key
   value             = each.value.variable.value
   protected         = lookup(each.value.variable, "protected", false)
@@ -1224,7 +1003,7 @@ resource "gitlab_project_variable" "variables" {
   variable_type     = lookup(each.value.variable, "variable_type", "env_var")
 }
 
-resource "gitlab_deploy_key" "keys" {
+resource "gitlab_deploy_key" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for key in lookup(project.settings, "deploy_keys", []) :
@@ -1236,32 +1015,13 @@ resource "gitlab_deploy_key" "keys" {
     }
   ]...)
 
-  project  = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project  = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   title    = each.value.deploy_key.title
   key      = each.value.deploy_key.key
   can_push = lookup(each.value.deploy_key, "can_push", false)
 }
 
-resource "gitlab_deploy_token" "tokens" {
-  for_each = merge([
-    for project in var.gitlab_projects : {
-      for token in lookup(project.settings, "deploy_tokens", []) :
-      "${project.namespace}-${project.name}-${token.name}" => {
-        project_name      = project.name
-        project_namespace = project.namespace
-        deploy_token      = token
-      }
-    }
-  ]...)
-
-  project    = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
-  name       = each.value.deploy_token.name
-  scopes     = each.value.deploy_token.scopes
-  expires_at = lookup(each.value.deploy_token, "expires_at", null)
-  username   = lookup(each.value.deploy_token, "username", null)
-}
-
-resource "gitlab_pages_domain" "domains" {
+resource "gitlab_pages_domain" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for domain in lookup(project.settings, "pages_domains", []) :
@@ -1273,7 +1033,7 @@ resource "gitlab_pages_domain" "domains" {
     }
   ]...)
 
-  project          = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project          = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   domain           = each.value.domain_data.domain
   key              = each.value.domain_data.key
   certificate      = lookup(each.value.domain_data, "auto_ssl_enabled", false) == true ? null : each.value.domain_data.certificate
@@ -1281,7 +1041,7 @@ resource "gitlab_pages_domain" "domains" {
   expired          = lookup(each.value.domain_data, "expired", false)
 }
 
-resource "gitlab_pipeline_schedule" "schedules" {
+resource "gitlab_pipeline_schedule" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for pipeline in lookup(project.settings, "pipeline_schedules", []) :
@@ -1293,7 +1053,7 @@ resource "gitlab_pipeline_schedule" "schedules" {
     }
   ]...)
 
-  project        = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project        = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   description    = each.value.pipeline_schedule.description
   ref            = each.value.pipeline_schedule.ref
   cron           = each.value.pipeline_schedule.cron
@@ -1302,7 +1062,7 @@ resource "gitlab_pipeline_schedule" "schedules" {
   take_ownership = lookup(each.value.pipeline_schedule, "take_ownership", false)
 }
 
-resource "gitlab_pipeline_trigger" "triggers" {
+resource "gitlab_pipeline_trigger" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for trigger in lookup(project.settings, "pipeline_triggers", []) :
@@ -1314,11 +1074,11 @@ resource "gitlab_pipeline_trigger" "triggers" {
     }
   ]...)
 
-  project     = tostring(gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id)
+  project     = tostring(gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id)
   description = each.value.trigger.description
 }
 
-resource "gitlab_release_link" "links" {
+resource "gitlab_release_link" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for release in lookup(project.settings, "release_links", []) :
@@ -1330,7 +1090,7 @@ resource "gitlab_release_link" "links" {
     }
   ]...)
 
-  project   = tostring(gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id)
+  project   = tostring(gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id)
   tag_name  = each.value.release_link.tag_name
   name      = each.value.release_link.name
   url       = each.value.release_link.url
@@ -1338,7 +1098,7 @@ resource "gitlab_release_link" "links" {
   link_type = lookup(each.value.release_link, "link_type", "other")
 }
 
-resource "gitlab_branch" "branches" {
+resource "gitlab_branch" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for branch in lookup(project.settings, "branches", []) :
@@ -1351,11 +1111,11 @@ resource "gitlab_branch" "branches" {
   ]...)
 
   name    = each.value.branch.name
-  project = gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id
+  project = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   ref     = each.value.branch.ref
 }
 
-resource "gitlab_repository_file" "files" {
+resource "gitlab_repository_file" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for file in lookup(project.settings, "repository_files", []) :
@@ -1367,7 +1127,7 @@ resource "gitlab_repository_file" "files" {
     }
   ]...)
 
-  project               = tostring(gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id)
+  project               = tostring(gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id)
   file_path             = each.value.file.file_path
   branch                = each.value.file.branch
   content               = each.value.file.content
@@ -1405,7 +1165,7 @@ resource "gitlab_integration_emails_on_push" "this" {
     if lookup(project.settings, "integration_emails_on_push", null) != null
   }
 
-  project                   = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
+  project                   = contains(keys(gitlab_project.this), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.this[*].id)
   recipients                = each.value.integration.recipients
   branches_to_be_notified   = each.value.integration.branches_to_be_notified
   disable_diffs             = each.value.integration.disable_diffs
@@ -1425,7 +1185,7 @@ resource "gitlab_integration_external_wiki" "this" {
     if lookup(project.settings, "integration_external_wiki", null) != null
   }
 
-  project           = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
+  project           = contains(keys(gitlab_project.this), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.this[*].id)
   external_wiki_url = each.value.integration.external_wiki_url
 }
 
@@ -1440,7 +1200,7 @@ resource "gitlab_integration_github" "this" {
     if lookup(project.settings, "integration_github", null) != null
   }
 
-  project        = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
+  project        = contains(keys(gitlab_project.this), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.this[*].id)
   token          = each.value.integration.token
   repository_url = each.value.integration.repository_url
   static_context = lookup(each.value.integration, "static_context", false)
@@ -1457,7 +1217,7 @@ resource "gitlab_integration_jira" "this" {
     if lookup(project.settings, "integration_jira", null) != null
   }
 
-  project                  = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
+  project                  = contains(keys(gitlab_project.this), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.this[*].id)
   url                      = each.value.integration.url
   username                 = each.value.integration.username
   password                 = each.value.integration.password
@@ -1486,7 +1246,7 @@ resource "gitlab_integration_microsoft_teams" "this" {
     if lookup(project.settings, "integration_microsoft_teams", null) != null
   }
 
-  project                      = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
+  project                      = contains(keys(gitlab_project.this), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.this[*].id)
   webhook                      = each.value.integration.webhook
   branches_to_be_notified      = each.value.integration.branches_to_be_notified
   confidential_issues_events   = each.value.integration.confidential_issues_events
@@ -1512,7 +1272,7 @@ resource "gitlab_integration_pipelines_email" "this" {
     if lookup(project.settings, "integration_pipelines_email", null) != null
   }
 
-  project                      = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
+  project                      = contains(keys(gitlab_project.this), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.this[*].id)
   recipients                   = toset(each.value.integration.recipients)
   notify_only_broken_pipelines = each.value.integration.notify_only_broken_pipelines
   branches_to_be_notified      = each.value.integration.branches_to_be_notified
@@ -1529,7 +1289,7 @@ resource "gitlab_integration_slack" "this" {
     if lookup(project.settings, "integration_slack", null) != null
   }
 
-  project                      = contains(keys(gitlab_project.projects), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.projects["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.projects[*].id)
+  project                      = contains(keys(gitlab_project.this), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.this[*].id)
   webhook                      = each.value.integration.webhook
   branches_to_be_notified      = each.value.integration.branches_to_be_notified
   confidential_issue_channel   = each.value.integration.confidential_issue_channel
@@ -1553,10 +1313,55 @@ resource "gitlab_integration_slack" "this" {
   wiki_page_events             = each.value.integration.wiki_page_events
 }
 
+# Combine Project and Group Deploy Tokens
+resource "gitlab_deploy_token" "this" {
+  for_each = merge(
+    merge([
+      for project in var.gitlab_projects : {
+        for token in lookup(project.settings, "deploy_tokens", []) :
+        "project-${project.namespace}-${project.name}-${token.name}" => {
+          type         = "project"
+          name         = token.name
+          namespace    = project.namespace
+          entity_name  = project.name
+          deploy_token = token
+          entity_id    = gitlab_project.this["${project.namespace}/${project.name}"].id
+        }
+      }
+    ]...),
+    merge([
+      for group in var.gitlab_groups : {
+        for token in lookup(group.settings, "deploy_tokens", []) : (
+          contains(keys(group), "parent")
+          ? "group-${group.parent}/${group.name}-${token.name}" # Include parent in the key if it exists
+          : "group-${group.name}-${token.name}"                 # Fallback to group name only if no parent
+          ) => {
+          type         = "group"
+          parent       = lookup(group, "parent", null)
+          name         = token.name
+          entity_name  = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+          deploy_token = token
+          entity_id    = contains(keys(group), "parent") ? gitlab_group.subgroups["${group.parent}/${group.name}"].id : gitlab_group.parent_groups[group.name].id
+        }
+      }
+    ]...)
+  )
+
+  # Conditional assignment for project or group
+  project = each.value.type == "project" ? each.value.entity_id : null
+  group   = each.value.type == "group" ? each.value.entity_id : null
+
+  name       = each.value.deploy_token.name
+  scopes     = each.value.deploy_token.scopes
+  expires_at = lookup(each.value.deploy_token, "expires_at", null)
+  username   = lookup(each.value.deploy_token, "username", null)
+}
+
 # Create GitLab Group Sharing
 resource "gitlab_group_share_group" "this" {
   for_each = {
-    for group in local.share_groups : "${group.parent}-${group.group_id}-${group.share_group_id}" => group
+    for group in local.share_groups :
+    group.parent != null ? "${group.parent}/${group.group_id}-${group.share_group_id}" : "${group.group_id}-${group.share_group_id}" => group
   }
 
   group_id = contains(keys(gitlab_group.parent_groups), each.value.group_id) ? gitlab_group.parent_groups[each.value.group_id].id : (
