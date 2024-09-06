@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0](https://github.com/opsworks-co/terraform-gitlab/compare/v1.0.0...v1.1.0) (2024-09-06)
+
+
+### Features
+
+* GitLab variables based on access tokens ([5c94981](https://github.com/opsworks-co/terraform-gitlab/commit/5c949813b7e162b34afe97a4f7f3822335ab2027))
+
+
+### Bug Fixes
+
+* remove comments ([5ca4912](https://github.com/opsworks-co/terraform-gitlab/commit/5ca4912bf8186ba7c969e8e92d6ea8dba26123a4))
+
 ## [1.0.0](https://github.com/opsworks-co/terraform-gitlab/compare/v0.3.0...v1.0.0) (2024-09-04)
 
 
