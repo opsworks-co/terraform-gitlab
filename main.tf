@@ -121,13 +121,40 @@ resource "gitlab_group_access_token" "this" {
   scopes       = each.value.token.scopes
   access_level = each.value.token.access_level
 
-  # Conditionally set either expires_at or rotation_configuration
-  expires_at = lookup(each.value.token, "expires_at", null)
+  # Conditionally set either `expires_at` or `rotation_configuration`, but not both
+  expires_at = contains(keys(each.value.token), "rotation_configuration") ? null : each.value.token.expires_at
 
-  rotation_configuration = each.value.token.expires_at == null && each.value.token.rotation_configuration != null ? {
+  rotation_configuration = contains(keys(each.value.token), "rotation_configuration") ? {
     expiration_days    = try(each.value.token.rotation_configuration.expiration_days, null)
     rotate_before_days = try(each.value.token.rotation_configuration.rotate_before_days, null)
   } : null
+}
+
+# Create GitLab Group Variables based on access tokens
+resource "gitlab_group_variable" "access_token_this" {
+  for_each = merge([
+    for group in var.gitlab_groups : {
+      for token in lookup(group.settings, "access_tokens", []) : (
+        contains(keys(group), "parent")
+        ? "${group.parent}/${group.name}-${token.name}" # Use parent in the key if it exists
+        : "${group.name}-${token.name}"                 # Fallback to group name only if no parent
+        ) => {
+        group_name = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+        parent     = lookup(group, "parent", null)
+        # token_value   = gitlab_group_access_token.this["${contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name}-${token.name}"].token
+        # token_name    = gitlab_group_access_token.this["${contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name}-${token.name}"].name
+        variable_name = lookup(token, "variable_name", null)
+      } if lookup(token, "variable_name", null) != null # Only create variables if `variable_name` is set
+    }
+  ]...)
+
+  group             = each.value.parent == null ? gitlab_group.parent_groups[each.value.group_name].id : gitlab_group.subgroups[each.value.group_name].id
+  key               = each.value.variable_name
+  value             = gitlab_group_access_token.this[each.key].token
+  protected         = true
+  masked            = true
+  environment_scope = "*"
+  description       = "Generated access token for ${gitlab_group_access_token.this[each.key].name}"
 }
 
 # Create GitLab Group Badges
@@ -590,6 +617,28 @@ resource "gitlab_project_access_token" "this" {
     expiration_days    = try(each.value.token.rotation_configuration.expiration_days, null)
     rotate_before_days = try(each.value.token.rotation_configuration.rotate_before_days, null)
   } : null
+}
+
+# Create GitLab Project Variables based on access tokens
+resource "gitlab_project_variable" "access_token_this" {
+  for_each = merge([
+    for project in var.gitlab_projects : {
+      for token in lookup(project.settings, "access_tokens", []) : "${project.namespace}-${project.name}-${token.name}" => {
+        project_id = gitlab_project.this["${project.namespace}/${project.name}"].id
+        # token_value   = gitlab_project_access_token.this["${project.namespace}-${project.name}-${token.name}"].token
+        # token_name    = token.name
+        variable_name = lookup(token, "variable_name", null)
+      } if lookup(token, "variable_name", null) != null # Only create variables if `variable_name` is set
+    }
+  ]...)
+
+  project           = each.value.project_id
+  key               = each.value.variable_name
+  value             = gitlab_project_access_token.this[each.key].token
+  protected         = true
+  masked            = true
+  environment_scope = "*"
+  description       = "Generated access token for ${gitlab_project_access_token.this[each.key].name}"
 }
 
 resource "gitlab_project_approval_rule" "this" {
