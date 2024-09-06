@@ -139,10 +139,8 @@ resource "gitlab_group_variable" "access_token_this" {
         ? "${group.parent}/${group.name}-${token.name}" # Use parent in the key if it exists
         : "${group.name}-${token.name}"                 # Fallback to group name only if no parent
         ) => {
-        group_name = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
-        parent     = lookup(group, "parent", null)
-        # token_value   = gitlab_group_access_token.this["${contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name}-${token.name}"].token
-        # token_name    = gitlab_group_access_token.this["${contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name}-${token.name}"].name
+        group_name    = contains(keys(group), "parent") ? "${group.parent}/${group.name}" : group.name
+        parent        = lookup(group, "parent", null)
         variable_name = lookup(token, "variable_name", null)
       } if lookup(token, "variable_name", null) != null # Only create variables if `variable_name` is set
     }
@@ -624,9 +622,7 @@ resource "gitlab_project_variable" "access_token_this" {
   for_each = merge([
     for project in var.gitlab_projects : {
       for token in lookup(project.settings, "access_tokens", []) : "${project.namespace}-${project.name}-${token.name}" => {
-        project_id = gitlab_project.this["${project.namespace}/${project.name}"].id
-        # token_value   = gitlab_project_access_token.this["${project.namespace}-${project.name}-${token.name}"].token
-        # token_name    = token.name
+        project_id    = gitlab_project.this["${project.namespace}/${project.name}"].id
         variable_name = lookup(token, "variable_name", null)
       } if lookup(token, "variable_name", null) != null # Only create variables if `variable_name` is set
     }
