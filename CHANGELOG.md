@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0](https://github.com/opsworks-co/terraform-gitlab/compare/v1.2.0...v1.3.0) (2024-10-01)
+
+
+### Features
+
+* Scheduled pipeline variables ([7d3ea73](https://github.com/opsworks-co/terraform-gitlab/commit/7d3ea73c227e29b82f8cce1b3bf9cb893e1a32a4))
+
 ## [1.2.0](https://github.com/opsworks-co/terraform-gitlab/compare/v1.1.0...v1.2.0) (2024-10-01)
 
 
