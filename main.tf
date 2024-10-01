@@ -1121,6 +1121,35 @@ resource "gitlab_pipeline_schedule" "this" {
   take_ownership = lookup(each.value.pipeline_schedule, "take_ownership", false)
 }
 
+# Create the map for 'for_each' by flattening the project, pipeline, and variable structure
+locals {
+  pipeline_variables = flatten([
+    for project in var.gitlab_projects : [
+      for pipeline in lookup(project.settings, "pipeline_schedules", []) : [
+        for variable in lookup(pipeline, "variables", []) : {
+          project_name      = project.name
+          project_namespace = project.namespace
+          pipeline_schedule = pipeline
+          variable          = variable
+          unique_key        = "${project.namespace}-${project.name}-${pipeline.ref}-${pipeline.description}-${variable.key}"
+        }
+      ]
+    ]
+  ])
+}
+
+# Convert the flattened list to a map for 'for_each'
+resource "gitlab_pipeline_schedule_variable" "variables" {
+  for_each = {
+    for item in local.pipeline_variables : item.unique_key => item
+  }
+
+  project              = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
+  pipeline_schedule_id = gitlab_pipeline_schedule.this["${each.value.project_namespace}-${each.value.project_name}-${each.value.pipeline_schedule.ref}-${each.value.pipeline_schedule.description}"].pipeline_schedule_id
+  key                  = each.value.variable.key
+  value                = each.value.variable.value
+}
+
 resource "gitlab_pipeline_trigger" "this" {
   for_each = merge([
     for project in var.gitlab_projects : {

@@ -220,6 +220,11 @@ projects:
           active: false
           cron_timezone: "UTC"
           take_ownership: false
+          variables:
+            - key: "ENVIRONMENT"
+              value: "development"
+            - key: "BUILD_TYPE"
+              value: "nightly"
       pipeline_triggers:
         - description: "Trigger for CI/CD pipeline"
         - description: "Backup Trigger"
