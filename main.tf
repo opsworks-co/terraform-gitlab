@@ -14,7 +14,6 @@ resource "gitlab_group" "parent_groups" {
 
   # Group settings
   auto_devops_enabled                = lookup(each.value.settings, "auto_devops_enabled", false)
-  default_branch_protection          = lookup(each.value.settings, "default_branch_protection", 2)
   lfs_enabled                        = lookup(each.value.settings, "lfs_enabled", true)
   mentions_disabled                  = lookup(each.value.settings, "mentions_disabled", false)
   project_creation_level             = lookup(each.value.settings, "project_creation_level", "maintainer")
@@ -33,6 +32,14 @@ resource "gitlab_group" "parent_groups" {
   shared_runners_minutes_limit       = lookup(each.value.settings, "shared_runners_minutes_limit", null)
   shared_runners_setting             = lookup(each.value.settings, "shared_runners_setting", null)
   wiki_access_level                  = lookup(each.value.settings, "wiki_access_level", null)
+
+  # Replace deprecated default_branch_protection with new block
+  default_branch_protection_defaults {
+    allow_force_push           = lookup(each.value.settings, "allow_force_push", false)
+    allowed_to_merge           = lookup(each.value.settings, "allowed_to_merge", ["maintainer"])
+    allowed_to_push            = lookup(each.value.settings, "allowed_to_push", ["maintainer"])
+    developer_can_initial_push = lookup(each.value.settings, "developer_can_initial_push", false)
+  }
 
   dynamic "push_rules" {
     for_each = length(lookup(each.value.settings, "push_rules", [])) > 0 ? toset(each.value.settings.push_rules) : []
@@ -74,7 +81,6 @@ resource "gitlab_group" "subgroups" {
 
   # Group settings
   auto_devops_enabled                = lookup(each.value.settings, "auto_devops_enabled", false)
-  default_branch_protection          = lookup(each.value.settings, "default_branch_protection", 2)
   lfs_enabled                        = lookup(each.value.settings, "lfs_enabled", true)
   mentions_disabled                  = lookup(each.value.settings, "mentions_disabled", false)
   project_creation_level             = lookup(each.value.settings, "project_creation_level", "maintainer")
@@ -93,6 +99,14 @@ resource "gitlab_group" "subgroups" {
   shared_runners_minutes_limit       = lookup(each.value.settings, "shared_runners_minutes_limit", null)
   shared_runners_setting             = lookup(each.value.settings, "shared_runners_setting", null)
   wiki_access_level                  = lookup(each.value.settings, "wiki_access_level", null)
+
+  # Replace deprecated default_branch_protection with new block
+  default_branch_protection_defaults {
+    allow_force_push           = lookup(each.value.settings, "allow_force_push", false)
+    allowed_to_merge           = lookup(each.value.settings, "allowed_to_merge", ["maintainer"])
+    allowed_to_push            = lookup(each.value.settings, "allowed_to_push", ["maintainer"])
+    developer_can_initial_push = lookup(each.value.settings, "developer_can_initial_push", false)
+  }
 
   lifecycle {
     create_before_destroy = true
@@ -1262,22 +1276,23 @@ resource "gitlab_integration_jira" "this" {
     if lookup(project.settings, "integration_jira", null) != null
   }
 
-  project                  = contains(keys(gitlab_project.this), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.this[*].id)
-  url                      = each.value.integration.url
-  username                 = each.value.integration.username
-  password                 = each.value.integration.password
-  api_url                  = each.value.integration.api_url
-  comment_on_event_enabled = each.value.integration.comment_on_event_enabled
-  commit_events            = each.value.integration.commit_events
-  issues_events            = each.value.integration.issues_events
-  jira_issue_transition_id = each.value.integration.jira_issue_transition_id
-  job_events               = each.value.integration.job_events
-  merge_requests_events    = each.value.integration.merge_requests_events
-  note_events              = each.value.integration.note_events
-  pipeline_events          = each.value.integration.pipeline_events
-  project_key              = each.value.integration.project_key
-  push_events              = each.value.integration.push_events
-  tag_push_events          = each.value.integration.tag_push_events
+  project                         = contains(keys(gitlab_project.this), "${each.value.project_namespace}/${each.value.project_name}") ? gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id : one(gitlab_project.this[*].id)
+  url                             = each.value.integration.url
+  username                        = each.value.integration.username
+  password                        = each.value.integration.password
+  api_url                         = each.value.integration.api_url
+  comment_on_event_enabled        = each.value.integration.comment_on_event_enabled
+  commit_events                   = each.value.integration.commit_events
+  issues_enabled                  = each.value.integration.issues_enabled
+  jira_auth_type                  = each.value.integration.jira_auth_type
+  jira_issue_prefix               = each.value.integration.jira_issue_prefix
+  jira_issue_regex                = each.value.integration.jira_issue_regex
+  jira_issue_transition_automatic = each.value.integration.jira_issue_transition_automatic
+  jira_issue_transition_id        = each.value.integration.jira_issue_transition_id
+  merge_requests_events           = each.value.integration.merge_requests_events
+  project_key                     = each.value.integration.project_key
+  project_keys                    = each.value.integration.project_keys
+  use_inherited_settings          = each.value.integration.use_inherited_settings
 }
 
 resource "gitlab_integration_microsoft_teams" "this" {
