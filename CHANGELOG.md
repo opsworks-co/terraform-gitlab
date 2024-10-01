@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0](https://github.com/opsworks-co/terraform-gitlab/compare/v1.1.0...v1.2.0) (2024-10-01)
+
+
+### Features
+
+* Fix provider version, jira integration fix, default branch protection ([b826b6e](https://github.com/opsworks-co/terraform-gitlab/commit/b826b6e6eccd78ccc650dde152bd69c4e5d59e86))
+
 ## [1.1.0](https://github.com/opsworks-co/terraform-gitlab/compare/v1.0.0...v1.1.0) (2024-09-06)
 
 
