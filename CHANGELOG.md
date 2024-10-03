@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0](https://github.com/opsworks-co/terraform-gitlab/compare/v1.3.0...v1.4.0) (2024-10-03)
+
+
+### Features
+
+* Add support for protected branches ([a4a6e0c](https://github.com/opsworks-co/terraform-gitlab/commit/a4a6e0c4ee4cfed8bb09f7111abb606f2fd0de96))
+
 ## [1.3.0](https://github.com/opsworks-co/terraform-gitlab/compare/v1.2.0...v1.3.0) (2024-10-01)
 
 
