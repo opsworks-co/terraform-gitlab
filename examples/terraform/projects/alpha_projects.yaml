@@ -33,6 +33,20 @@ projects:
       - create: "30m"
         delete: "30m"
     settings:
+      branches:
+        - name: main
+          ref: ""
+          protected: true
+          allow_force_push: true
+          code_owner_approval_required: true
+          allowed_to_push:
+            - user_email: "user@domain.com"
+            - group: "roles/project-sre-dev"
+          allowed_to_merge:
+            - user_email: "user@domain.com"
+          allowed_to_unprotect:
+            - user_email: "user@domain.com"
+            - group: "roles/project-sre-dev"
       access_tokens:
         - name: "beta-token"
           scopes: ["api"]
