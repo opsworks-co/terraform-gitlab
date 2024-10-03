@@ -1000,7 +1000,8 @@ resource "gitlab_project_protected_environment" "this" {
         access_level       = lookup(rule, "access_level", null)
         required_approvals = lookup(rule, "required_approvals", null)
         group_id           = lookup(rule, "group", null) != null && contains(keys(local.exists_groups), lookup(rule, "group", "")) ? local.exists_groups[lookup(rule, "group", "")][0].group_id : null
-      user_id = lookup(rule, "user_email", null) != null && contains(keys(local.exists_users), lookup(rule, "user_email", "")) ? local.exists_users[lookup(rule, "user_email", "")].id : null }
+        user_id            = lookup(rule, "user_email", null) != null && contains(keys(local.exists_users), lookup(rule, "user_email", "")) ? local.exists_users[lookup(rule, "user_email", "")].id : null
+      }
     ]
   ])
 }
@@ -1201,6 +1202,55 @@ resource "gitlab_branch" "this" {
   name    = each.value.branch.name
   project = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
   ref     = each.value.branch.ref
+}
+
+# Create GitLab Branch Protection for Protected Branches
+resource "gitlab_branch_protection" "this" {
+  for_each = merge([
+    for project in var.gitlab_projects : {
+      for branch in lookup(project.settings, "branches", []) :
+      "${project.namespace}-${project.name}-${branch.name}" => {
+        project_name      = project.name
+        project_namespace = project.namespace
+        branch            = branch
+      } if lookup(branch, "protected", false) == true # Only create protection if `protected` is set to true
+    }
+  ]...)
+
+  project                      = gitlab_project.this["${each.value.project_namespace}/${each.value.project_name}"].id
+  branch                       = each.value.branch.name
+  push_access_level            = lookup(each.value.branch, "push_access_level", "maintainer")
+  merge_access_level           = lookup(each.value.branch, "merge_access_level", "maintainer")
+  unprotect_access_level       = lookup(each.value.branch, "unprotect_access_level", "admin")
+  allow_force_push             = lookup(each.value.branch, "allow_force_push", false)
+  code_owner_approval_required = lookup(each.value.branch, "code_owner_approval_required", true)
+
+  # Dynamic blocks for allowed_to_push
+  dynamic "allowed_to_push" {
+    for_each = lookup(each.value.branch, "allowed_to_push", [])
+    content {
+      user_id  = contains(keys(local.exists_users), lookup(allowed_to_push.value, "user_email", "")) ? local.exists_users[allowed_to_push.value.user_email].id : null
+      group_id = contains(keys(local.exists_groups), lookup(allowed_to_push.value, "group", "")) ? local.exists_groups[allowed_to_push.value.group][0].group_id : null
+    }
+  }
+
+  # Dynamic blocks for allowed_to_merge
+  dynamic "allowed_to_merge" {
+    for_each = lookup(each.value.branch, "allowed_to_merge", [])
+    content {
+      user_id  = contains(keys(local.exists_users), lookup(allowed_to_merge.value, "user_email", "")) ? local.exists_users[allowed_to_merge.value.user_email].id : null
+      group_id = contains(keys(local.exists_groups), lookup(allowed_to_merge.value, "group", "")) ? local.exists_groups[allowed_to_merge.value.group][0].group_id : null
+    }
+  }
+
+  # Dynamic blocks for allowed_to_unprotect
+  dynamic "allowed_to_unprotect" {
+    for_each = lookup(each.value.branch, "allowed_to_unprotect", [])
+    content {
+      user_id  = contains(keys(local.exists_users), lookup(allowed_to_unprotect.value, "user_email", "")) ? local.exists_users[allowed_to_unprotect.value.user_email].id : null
+      group_id = contains(keys(local.exists_groups), lookup(allowed_to_unprotect.value, "group", "")) ? local.exists_groups[allowed_to_unprotect.value.group][0].group_id : null
+    }
+  }
 }
 
 resource "gitlab_repository_file" "this" {
