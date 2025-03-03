@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0](https://github.com/opsworks-co/terraform-gitlab/compare/v1.4.0...v1.5.0) (2025-03-03)
+
+
+### Features
+
+* Add sensitive variables support, update provider ([58fdcf4](https://github.com/opsworks-co/terraform-gitlab/commit/58fdcf405e4ee1cdf9a91788b5f32e22305d7196))
+
 ## [1.4.0](https://github.com/opsworks-co/terraform-gitlab/compare/v1.3.0...v1.4.0) (2024-10-03)
 
 
