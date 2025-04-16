@@ -105,6 +105,10 @@ groups:
         #     - label_id: "Feature"
         #       position: 2
         #   milestone_id: 123456
+      push_rules: []
+        # - prevent_secrets: true
+        #   commit_message_regex: '^(feat|merge|revert):.*'
+        #   branch_name_regex: '^(feat|merge|revert)/[A-Z]{2,3}-[0-9]+$'
       share_groups:
         - share_group_id: "roles/security-view" # The group with which 'dev' will be shared
           group_access: reporter # Access level for the shared group (e.g., 30 for Developer)
