@@ -108,6 +108,23 @@ resource "gitlab_group" "subgroups" {
     developer_can_initial_push = lookup(each.value.settings, "developer_can_initial_push", false)
   }
 
+  dynamic "push_rules" {
+    for_each = try(each.value.settings.push_rules, [])
+    iterator = rule
+    content {
+      author_email_regex            = try(rule.value.author_email_regex, null)
+      branch_name_regex             = try(rule.value.branch_name_regex, null)
+      commit_committer_check        = try(rule.value.commit_committer_check, null)
+      commit_message_negative_regex = try(rule.value.commit_message_negative_regex, null)
+      commit_message_regex          = try(rule.value.commit_message_regex, null)
+      deny_delete_tag               = try(rule.value.deny_delete_tag, null)
+      file_name_regex               = try(rule.value.file_name_regex, null)
+      max_file_size                 = try(rule.value.max_file_size, null)
+      member_check                  = try(rule.value.member_check, null)
+      prevent_secrets               = try(rule.value.prevent_secrets, null)
+      reject_unsigned_commits       = try(rule.value.reject_unsigned_commits, null)
+    }
+  }
   lifecycle {
     create_before_destroy = true
   }
