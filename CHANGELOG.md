@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0](https://github.com/opsworks-co/terraform-gitlab/compare/v1.5.0...v1.6.0) (2025-04-18)
+
+
+### Features
+
+* Push rules for subgroups ([0ac66c6](https://github.com/opsworks-co/terraform-gitlab/commit/0ac66c6bcf5c62b5be05611d63dab0ef5501b935))
+
 ## [1.5.0](https://github.com/opsworks-co/terraform-gitlab/compare/v1.4.0...v1.5.0) (2025-03-03)
 
 
