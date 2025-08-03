@@ -1,5 +1,7 @@
 # GitLab Terraform Module
 
+## This repository is discontinued, further work at https://github.com/Perun-Engineering/terraform-gitlab
+
 This Terraform module provides resources to manage GitLab groups, projects, integrations, and other configurations. It supports creating and managing GitLab resources using a structured configuration approach with YAML files or direct variable definitions.
 
 ## Features
